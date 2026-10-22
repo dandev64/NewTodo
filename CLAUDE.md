@@ -112,7 +112,8 @@ public/
 - `public/sw.js`: network-first for page navigations (cached `/` fallback offline), cache-first for hashed
   `/assets/*`. **Never caches cross-origin requests** (Google APIs). Bump `CACHE` name if caching logic changes.
 - Registered only in production builds, so dev/HMR isn't affected.
-- iPhone install requires an **HTTPS deployment** (Vercel suggested, not set up yet). Home-screen web apps are
+- Deployed on **Vercel** via GitHub import (auto-deploys on push to `main`); `vercel.json` sets `no-cache` on `sw.js`
+  so updates reach installed apps. iPhone install requires this HTTPS deployment. Home-screen web apps are
   exempt from Safari's 7-day storage eviction, but data is still per-device until there's sync.
 
 ## Testing approach
@@ -134,7 +135,7 @@ page — go to `about:blank` first when simulating an OAuth return.
 
 ## Roadmap / next steps (in rough order)
 
-1. **Deploy** (Vercel) so the PWA can be installed on iPhone; add the deployed URL to the Google OAuth client.
+1. Add the Vercel URL to the Google OAuth client (origins + redirect URI) and `VITE_GOOGLE_CLIENT_ID` to Vercel env vars.
 2. **Push todos → Google Calendar** (scope `calendar.events`; create/update/delete events for linked todos; decide
    all-day vs. timed; use `extendedProperties.private` to tag events created by the app).
 3. **Microsoft**: Outlook calendar (and Teams meetings, which live there) via Microsoft Graph with MSAL; possibly
