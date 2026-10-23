@@ -5,6 +5,9 @@ import App from './App.tsx';
 import { StoreProvider } from './store.tsx';
 import { handleGoogleRedirect } from './lib/google.ts';
 import { completeSignIn } from './lib/account.ts';
+import { trackVisualViewport } from './lib/viewport.ts';
+
+trackVisualViewport();
 
 // Must run before render so the token Google put in the URL hash is consumed exactly once.
 const redirect = handleGoogleRedirect();

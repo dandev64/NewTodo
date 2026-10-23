@@ -46,6 +46,9 @@ export function CategoryEditorSheet({ goal, onClose }: { goal: Goal | null; onCl
           placeholder="Category name"
           value={title}
           maxLength={40}
+          enterKeyHint="done"
+          autoCapitalize="words"
+          autoComplete="off"
           style={{ color }}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && save()}

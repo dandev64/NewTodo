@@ -4,6 +4,13 @@
   box-sizing: border-box;
 }
 
+html {
+  /* No font inflation in landscape; no double-tap zoom (pinch-zoom still works). */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
 :root {
   --text: #1a1a1a;
   --muted: #9a9aa2;
@@ -23,6 +30,13 @@
 
 body {
   margin: 0;
+  /* No rubber-band bounce revealing the page background in the home-screen app. */
+  overscroll-behavior-y: none;
+}
+
+html.sheet-open,
+html.sheet-open body {
+  overflow: hidden;
 }
 
 button {
@@ -32,9 +46,15 @@ button {
   border: 0;
   padding: 0;
   cursor: pointer;
+  /* Long-press on a button shouldn't select its text or open the iOS callout. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
-input {
+input,
+select,
+textarea {
   font: inherit;
   color: inherit;
 }

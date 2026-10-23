@@ -52,6 +52,9 @@ export function TodoFormSheet({ todo, status = 'todo', defaultDate, initial, onC
             placeholder="Enter a todo"
             value={title}
             maxLength={200}
+            enterKeyHint="done"
+            autoCapitalize="sentences"
+            autoComplete="off"
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && save()}
           />

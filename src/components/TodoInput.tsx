@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { revealAboveKeyboard } from '../lib/viewport';
 
 type Props = {
   color: string;
@@ -15,7 +16,10 @@ export function TodoInput({ color, initial = '', keepOpen, onSubmit, onClose }: 
   const closed = useRef(false);
 
   useEffect(() => {
-    ref.current?.focus();
+    const el = ref.current;
+    if (!el) return;
+    el.focus({ preventScroll: true });
+    revealAboveKeyboard(el);
   }, []);
 
   const close = () => {
@@ -27,8 +31,11 @@ export function TodoInput({ color, initial = '', keepOpen, onSubmit, onClose }: 
   const commit = (stayOpen: boolean) => {
     const title = value.trim();
     if (title && title !== initial) onSubmit(title);
-    if (title && stayOpen) setValue('');
-    else close();
+    if (title && stayOpen) {
+      setValue('');
+      // The new todo pushes this input down; keep it above the keyboard.
+      if (ref.current) revealAboveKeyboard(ref.current);
+    } else close();
   };
 
   return (
@@ -41,6 +48,9 @@ export function TodoInput({ color, initial = '', keepOpen, onSubmit, onClose }: 
         value={value}
         placeholder="Enter a todo"
         maxLength={200}
+        enterKeyHint={keepOpen ? 'next' : 'done'}
+        autoCapitalize="sentences"
+        autoComplete="off"
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
           if (e.nativeEvent.isComposing) return;

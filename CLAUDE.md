@@ -206,6 +206,19 @@ public/
   users (max 100). Publishing the app (basic scopes need no verification; calendar scopes show an unverified
   warning) would open it to anyone.
 
+## iPhone / touch conventions (keep these)
+
+- **Inputs must be ≥ 16px** (`input, select, textarea { font-size: 16px !important }` at the end of App.css) or iOS
+  zooms the page on focus. Don't "fix" zoom with `maximum-scale=1` (kills pinch-zoom on Android).
+- **Hover styles only inside `@media (hover: hover)`**, otherwise they stick after a tap on iOS.
+- Touch sizes live in the `@media (pointer: coarse)` block (≈40–44 px targets; checkbox hit area via `::after`).
+- **Keyboard:** `lib/viewport.ts` sets `--kb` (keyboard height) and `--vvh` from `visualViewport`. Bottom sheets
+  sit at `bottom: var(--kb)`; `.content` gets `--kb` extra bottom padding. Inline inputs focus with
+  `preventScroll` and call `revealAboveKeyboard()` (on focus and after each add) because iOS opens the keyboard after
+  focus and won't scroll the field up itself.
+- Open sheets add `html.sheet-open` (body scroll lock). `touch-action: manipulation` disables double-tap zoom.
+- Inputs set `enterKeyHint` / `autoCapitalize`.
+
 ## Testing approach
 
 Two-device sync was tested with two isolated headless Edge profiles against `vercel dev` and the real Neon DB,
