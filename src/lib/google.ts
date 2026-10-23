@@ -123,32 +123,70 @@ export function useGoogleAuth() {
 
 // ---------- sign in / out ----------
 
-export function connectGoogle() {
+/** What a redirect to Google was for: the app account, or Google Calendar access. */
+type RedirectPurpose = 'signin' | 'calendar';
+type PendingRedirect = { state: string; purpose: RedirectPurpose; nonce?: string };
+
+function redirectToGoogle(purpose: RedirectPurpose, extra: Record<string, string>) {
   if (!GOOGLE_CLIENT_ID) return;
-  const state = crypto.randomUUID();
-  localStorage.setItem(STATE_KEY, state);
+  const pending: PendingRedirect = { state: crypto.randomUUID(), purpose };
+  if (purpose === 'signin') pending.nonce = crypto.randomUUID();
+  localStorage.setItem(STATE_KEY, JSON.stringify(pending));
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: `${location.origin}/`,
-    response_type: 'token',
-    scope: `${EVENTS_SCOPE} ${CALENDARLIST_SCOPE}`,
-    include_granted_scopes: 'true',
-    state,
+    state: pending.state,
+    ...(pending.nonce ? { nonce: pending.nonce } : {}),
+    ...extra,
   });
   location.assign(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
 }
 
-/** Call once at startup. Consumes `#access_token=…` from the redirect. Returns an error message, if any. */
-export function handleGoogleRedirect(): string | null {
-  if (!location.hash.includes('access_token=') && !location.hash.includes('error=')) return null;
-  const params = new URLSearchParams(location.hash.slice(1));
-  const expected = localStorage.getItem(STATE_KEY);
+/** Connect Google Calendar (access token for the Calendar API). */
+export function connectGoogle() {
+  redirectToGoogle('calendar', {
+    response_type: 'token',
+    scope: `${EVENTS_SCOPE} ${CALENDARLIST_SCOPE}`,
+    include_granted_scopes: 'true',
+  });
+}
+
+/** Sign in to the app account (ID token proving who the user is). */
+export function signInWithGoogleRedirect() {
+  redirectToGoogle('signin', { response_type: 'id_token', scope: 'openid email profile', prompt: 'select_account' });
+}
+
+export type RedirectResult = { error?: string; signIn?: { idToken: string; nonce: string } };
+
+/** Call once at startup. Consumes the `#…` fragment Google redirects back with. */
+export function handleGoogleRedirect(): RedirectResult {
+  const hash = location.hash;
+  if (!hash.includes('access_token=') && !hash.includes('id_token=') && !hash.includes('error=')) return {};
+  const params = new URLSearchParams(hash.slice(1));
+  let pending: PendingRedirect | null = null;
+  try {
+    const raw = localStorage.getItem(STATE_KEY);
+    // Older builds stored the bare state string (calendar connect only).
+    pending = raw?.startsWith('{') ? (JSON.parse(raw) as PendingRedirect) : raw ? { state: raw, purpose: 'calendar' } : null;
+  } catch {
+    pending = null;
+  }
   localStorage.removeItem(STATE_KEY);
   history.replaceState(null, '', location.pathname + location.search);
 
-  if (!expected || params.get('state') !== expected) return 'Google sign-in failed (state mismatch). Please try again.';
+  if (!pending || params.get('state') !== pending.state) {
+    return { error: 'Google sign-in failed (state mismatch). Please try again.' };
+  }
   const error = params.get('error');
-  if (error) return error === 'access_denied' ? 'Google Calendar access was not granted.' : `Google sign-in failed: ${error}`;
+  if (error) {
+    if (error !== 'access_denied') return { error: `Google sign-in failed: ${error}` };
+    return { error: pending.purpose === 'signin' ? 'Sign-in was cancelled.' : 'Google Calendar access was not granted.' };
+  }
+
+  if (pending.purpose === 'signin') {
+    const idToken = params.get('id_token');
+    return idToken && pending.nonce ? { signIn: { idToken, nonce: pending.nonce } } : { error: 'Google sign-in failed.' };
+  }
 
   writeAuth({
     ...auth,
@@ -156,7 +194,12 @@ export function handleGoogleRedirect(): string | null {
     expiresAt: Date.now() + Number(params.get('expires_in') ?? 3600) * 1000,
     scope: params.get('scope') ?? undefined,
   });
-  return null;
+  return {};
+}
+
+/** Forget the Calendar connection on this device only (no revoke, so other devices stay connected). */
+export function forgetGoogle() {
+  writeAuth(null);
 }
 
 export function disconnectGoogle() {
@@ -174,6 +217,13 @@ export function disconnectGoogle() {
 // ---------- API ----------
 
 export class GoogleAuthExpired extends Error {}
+export class GoogleApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
 /** The event no longer exists (deleted in Google Calendar). */
 export class GoogleEventGone extends Error {}
 
@@ -230,19 +280,39 @@ async function api(token: string, path: string, init: RequestInit = {}): Promise
     } catch {
       // non-JSON error body
     }
-    throw new Error(`Google Calendar error (${res.status})${detail ? `: ${detail}` : ''}`);
+    throw new GoogleApiError(`Google Calendar error (${res.status})${detail ? `: ${detail}` : ''}`, res.status);
   }
   return res;
 }
 
 const PRIMARY = '/calendars/primary/events';
 
-/** Create (no id) or update an event on the primary calendar. Returns the event id. */
-export async function saveEvent(token: string, eventId: string | undefined, event: EventInput): Promise<string> {
-  // nulls only make sense for PATCH (clearing a merged field); leave them out of inserts.
-  const res = eventId
-    ? await api(token, `${PRIMARY}/${encodeURIComponent(eventId)}`, { method: 'PATCH', body: JSON.stringify(event) })
-    : await api(token, PRIMARY, { method: 'POST', body: JSON.stringify(event, (_k, v) => (v === null ? undefined : v)) });
+/**
+ * Create (no `eventId`) or update an event on the primary calendar. Returns the event id.
+ * New events use `newId` (derived from the todo id) so two devices creating the same
+ * todo's event at once can't make duplicates: the second insert gets 409 and patches instead.
+ */
+export async function saveEvent(
+  token: string,
+  eventId: string | undefined,
+  event: EventInput,
+  newId?: string,
+): Promise<string> {
+  const patch = (id: string) =>
+    api(token, `${PRIMARY}/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(event) });
+  let res: Response;
+  if (eventId) {
+    res = await patch(eventId);
+  } else {
+    // nulls only make sense for PATCH (clearing a merged field); leave them out of inserts.
+    const body = JSON.stringify({ ...event, ...(newId ? { id: newId } : {}) }, (_k, v) => (v === null ? undefined : v));
+    try {
+      res = await api(token, PRIMARY, { method: 'POST', body });
+    } catch (e) {
+      if (!(newId && e instanceof GoogleApiError && e.status === 409)) throw e;
+      res = await patch(newId);
+    }
+  }
   const saved = (await res.json()) as ApiEvent;
   // A PATCH on an event the user deleted in Google succeeds but stays cancelled.
   if (saved.status === 'cancelled') throw new GoogleEventGone('Event was deleted in Google Calendar');

@@ -44,6 +44,12 @@ function localDateTime(date: string, time: string, minutes = 0): string {
 
 export const DEFAULT_DURATION = 60;
 
+/** Google event ids must be base32hex (a–v, 0–9); a UUID without dashes qualifies. */
+export function eventIdFor(todo: Todo): string | undefined {
+  const id = `tm${todo.id.replace(/-/g, '').toLowerCase()}`;
+  return /^[a-v0-9]{5,1024}$/.test(id) ? id : undefined;
+}
+
 export function buildEvent(todo: Todo, goal: Goal | undefined): EventInput {
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const timed = !!todo.time;
@@ -128,7 +134,7 @@ export function useGoogleSync() {
       if (inFlight.current.has(key)) continue;
       inFlight.current.add(key);
 
-      saveEvent(token, todo.gcal.eventId, buildEvent(todo, goal))
+      saveEvent(token, todo.gcal.eventId, buildEvent(todo, goal), eventIdFor(todo))
         .then((eventId) => {
           inFlight.current.delete(key);
           // The todo may have been deleted or taken off the calendar while we were saving.

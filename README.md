@@ -2,7 +2,8 @@
 
 A mobile-first todo app inspired by [Todo Mate](https://www.todomate.net/): a monthly calendar where each day shows
 your progress, color-coded goals, a Kanban board, and Google Calendar events alongside your todos.
-Installable on iPhone/Android as a home-screen web app (PWA). Data is stored locally in the browser.
+Installable on iPhone/Android as a home-screen web app (PWA). Sign in with Google to use the same account on
+several devices; everything also works offline.
 
 **Live:** https://newtodo-beryl.vercel.app
 
@@ -14,6 +15,7 @@ Installable on iPhone/Android as a home-screen web app (PWA). Data is stored loc
 - **Todo actions**: edit, delete, do it tomorrow / today, do another day, change date, repeat (daily / weekly / monthly).
 - **Board**: To do / In progress / Done columns with filters by range and goal; drag & drop on desktop.
 - **Google Calendar**: events from all your calendars on Home (auto-refreshing); turn any event into a todo; send todos to Google as all-day or timed events, kept in sync both ways.
+- **Accounts & sync**: Sign in with Google; todos and categories sync between devices within seconds (Neon Postgres).
 - **PWA**: app icon, full-screen standalone mode, works offline.
 
 ## Getting started
@@ -22,7 +24,8 @@ Requires Node.js 20+.
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
+npm run dev                  # http://localhost:5173 (frontend only)
+vercel dev --listen 5173     # frontend + API (sign-in and sync)
 ```
 
 Other scripts: `npm run build`, `npm run preview`, `npm run lint`.
@@ -48,5 +51,6 @@ open the URL in Safari, then **Share → Add to Home Screen**.
 
 ## Tech
 
-React 19, TypeScript, Vite — no other runtime dependencies. See [CLAUDE.md](CLAUDE.md) for architecture, data model
+React 19, TypeScript, Vite on the frontend; Vercel Functions + Neon Postgres (`@neondatabase/serverless`, `jose`)
+for accounts and sync. See [CLAUDE.md](CLAUDE.md) for architecture, data model
 and design decisions.

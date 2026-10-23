@@ -10,7 +10,10 @@ The long-term goal is to connect it to **Google Calendar** and **Microsoft (Outl
 
 Owner preferences (decided in conversation, don't re-litigate without asking):
 - **Web app + PWA**, not a native/App Store app (no Mac, no $99 Apple dev account needed).
-- **Local storage only** for now — no backend, no accounts.
+- **Accounts = Google accounts** ("Sign in with Google"), so one account works on several devices. Data is
+  local-first (localStorage) and synced to **Neon Postgres** through two Vercel Functions. Supabase was dropped
+  because the user couldn't log in there; Neon was provisioned through the existing Vercel login (`vercel
+  integration add neon`), so no extra accounts. Email/password sign-in was not built.
 - **Mobile-first** narrow layout (max width 440px, centered on desktop) with a bottom tab bar.
 - v1 features chosen: calendar with day-progress icons, colored goals, todo actions, repeat.
 - **"Goals" are called "Categories" in the UI** (the user's word; same concept as Todo Mate's goals). Code and
@@ -26,24 +29,39 @@ Owner preferences (decided in conversation, don't re-litigate without asking):
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173 (Google OAuth redirect URI is registered for this port)
+npm run dev      # http://localhost:5173 — frontend only; /api is NOT served (sign-in/sync won't work)
+vercel dev --listen 5173   # frontend + /api functions (uses Vercel "development" env vars)
 npm run build    # tsc -b && vite build  → dist/
 npm run lint     # oxlint (3 known "only-export-components" warnings in store.tsx — harmless)
 npm run preview  # serve dist/ (service worker only registers in production builds)
+node --env-file=<pulled env file> scripts/migrate.mjs   # apply db/schema.sql (idempotent)
 ```
+
+Server env vars (Vercel): `DATABASE_URL` (+ other `PG*`/`POSTGRES_*` from the Neon integration),
+`SESSION_SECRET` (signs app sessions; hidden "sensitive" value in Production/Preview, a separate known value in
+Development that matches `.env.local`), and `VITE_GOOGLE_CLIENT_ID` (also used server-side as the expected ID-token
+audience). Never commit pulled env files; pull them into a temp dir.
 
 `.env.local` (git-ignored) holds `VITE_GOOGLE_CLIENT_ID` (and a `VERCEL_OIDC_TOKEN` written by `vercel link` — leave it). See `.env.example`.
 Vite only reads env files at startup — **restart `npm run dev` after editing it**.
 
 ## Stack
 
-React 19 + TypeScript + Vite 8, plain CSS, **no runtime dependencies besides React**. No router (tabs are local
+React 19 + TypeScript + Vite 8, plain CSS. Frontend has **no runtime dependencies besides React**. The backend
+(`api/`, Vercel Functions, Web `Request`/`Response` handlers) uses `@neondatabase/serverless` and `jose`. No router (tabs are local
 state in `App.tsx`), no state library (a `useReducer` + context store), no UI kit (icons are inline SVG).
 Keep it that way unless there's a real need.
 
 ## File map
 
 ```
+api/                    Vercel Functions (type-checked by tsconfig.api.json; `_lib` files aren't routes)
+  auth/google.ts        POST { idToken, nonce } → verify Google ID token (JWKS, aud = client id, nonce) →
+                        upsert users → { token: 180-day HS256 session, user }
+  sync.ts               POST { since, changes } → last-write-wins upsert + everything with seq > since
+  _lib/session.ts       Google ID-token verification, session create/verify
+  _lib/http.ts          json(), readJson(), db() (Neon HTTP driver)
+db/schema.sql           users + records tables (apply with scripts/migrate.mjs)
 src/
   main.tsx              Entry. Consumes the Google OAuth redirect hash BEFORE render; registers sw.js in prod.
   App.tsx               Shell: tab state (home | board | categories | my), bottom tab bar, error banner.
@@ -55,6 +73,8 @@ src/
   lib/google.ts         Google OAuth (redirect implicit flow), token store (useSyncExternalStore), events API.
   lib/gcalSync.ts       Todo ↔ Google event mapping + useGoogleSync() engine (mounted in App): push + pull.
   lib/gcalPull.ts       Shared per-month events cache (useMonthEvents), focus/visibility + polling refresh.
+  lib/account.ts        App account session store (useAccount), completeSignIn(), sync status.
+  lib/cloudSync.ts      useCloudSync() engine (mounted in App) + signOut().
   pages/
     HomePage.tsx        Calendar + Google events section + goals with todos (the Todo Mate main screen).
     BoardPage.tsx       Kanban: To do / In progress / Done, range + goal filters, drag & drop, quick-advance button.
@@ -154,7 +174,43 @@ public/
   so updates reach installed apps. iPhone install requires this HTTPS deployment. Home-screen web apps are
   exempt from Safari's 7-day storage eviction, but data is still per-device until there's sync.
 
+## Accounts & cloud sync
+
+- **Sign-in:** `signInWithGoogleRedirect()` (lib/google.ts) redirects with `response_type=id_token`, scope
+  `openid email profile`, a `nonce`, `prompt=select_account`. The pending redirect is stored as JSON
+  `{ state, purpose: 'signin' | 'calendar', nonce }` under `todomate.google.oauthState`; `handleGoogleRedirect()`
+  returns `{ error?, signIn? }`, and main.tsx calls `completeSignIn()` which exchanges the ID token at
+  `/api/auth/google`. The session lives in localStorage `todomate.account` (180 days). Signing in is separate from
+  connecting Google Calendar (different scopes, different flow).
+- **Records:** each category (`goal`, data includes `pos` = list index), todo (`todo`) and `settings` object is one
+  row in `records` keyed by (user_id, kind, id). `gcalDeletes` is device-local and not synced.
+- **Client engine (lib/cloudSync.ts):** per-record meta in localStorage `todomate.sync`
+  (`{ userId, cursor, initialized, records: { key: { h: hash, u: editedAt, p?: pending, d?: deleted } } }`).
+  After each store change, records whose stable-JSON hash changed get a new `u` and `p`. A round POSTs pending
+  records (batches of 400) with `since: cursor` and applies what comes back via `sync/apply` (skipping records
+  where a local pending edit is newer). Echoes of our own writes match by hash and are no-ops. Runs on change
+  (400 ms debounce), every 5 s while visible, on focus/visibility/online.
+- **First sync on a device** pulls everything first. If the device has **no todos**, it adopts the account's data
+  (`sync/replace`) instead of uploading its starter Work/Personal categories (no duplicates); otherwise it merges and
+  uploads local-only records.
+- **Server (api/sync.ts):** writes for a user are serialized with `pg_advisory_xact_lock` inside one transaction so
+  `seq` order = visibility order (pull-after-cursor never skips). Upsert only if `updated_at` is newer.
+  `updated_at` is clamped to now + 5 min. Max 500 changes/request, 32 KB/record, 1000 rows/page (`hasMore`).
+- **Sign out** (`signOut()`): clears session + sync meta + local data (`sync/clear`, which does *not* queue Google
+  event deletions) and forgets the Calendar token on this device without revoking it. Cloud data stays.
+  A 401 from /api/sync marks the session `expired` (local data kept, "Sign in again" shown).
+- **Google Calendar with several devices:** new events are created with a deterministic id
+  (`eventIdFor()` = `tm` + todo UUID hex); a second device inserting the same event gets 409 and PATCHes instead,
+  so two devices can't create duplicates. `gcal` sync state is part of the synced todo record.
+- **Other people** can only sign in while the Google Cloud project is in Testing mode if they're added as test
+  users (max 100). Publishing the app (basic scopes need no verification; calendar scopes show an unverified
+  warning) would open it to anyone.
+
 ## Testing approach
+
+Two-device sync was tested with two isolated headless Edge profiles against `vercel dev` and the real Neon DB,
+using a throwaway user row + a session minted with the Development `SESSION_SECRET` (Google's own login can't be
+automated; the redirect was simulated and `/api/auth/google` intercepted). Delete test rows afterwards.
 
 No test framework is set up. Changes have been verified by `npm run build` + `npm run lint` and by driving the app
 in **headless Edge via the Chrome DevTools Protocol** (Node script: navigate, click via `Runtime.evaluate`, type via
@@ -168,7 +224,9 @@ page — go to `about:blank` first when simulating an OAuth return.
 - No drag-to-reorder of todos (Home or within a Board column). Board columns sort by date → goal → order.
 - Board drag & drop uses HTML5 DnD → desktop only; on touch use the ▶ / ✓ quick button or the status switch.
 - Editing a repeating todo's title only changes that one instance.
-- Data is local to each browser/device. "All" on the Board can get long with big repeat series.
+- Sync is near-real-time by polling (5 s), not push. Conflicts are last-write-wins per whole record (a todo edited
+  on two devices while offline keeps the later edit). Device clocks decide "later".
+- "All" on the Board can get long with big repeat series.
 - Google: sync (both directions) only runs while the app is open and signed in (~1h tokens, no backend). Imported
   todos are snapshots. Pushed events live on the primary calendar. Description/color/attendee edits in Google aren't
   pulled (only title, done ✓, date, time, duration).
@@ -178,7 +236,8 @@ page — go to `about:blank` first when simulating an OAuth return.
 1. Add the Vercel URL to the Google OAuth client (origins + redirect URI) and `VITE_GOOGLE_CLIENT_ID` to Vercel env vars.
 3. **Microsoft**: Outlook calendar (and Teams meetings, which live there) via Microsoft Graph with MSAL; possibly
    Microsoft Planner as an external Kanban. Work/tenant accounts may require admin consent.
-4. Probably a small **backend** (refresh tokens, cross-device sync) once integrations are two-way.
+4. Use the backend for Google **refresh tokens** (code flow + client secret in Vercel env) so Calendar sync
+   doesn't need hourly reconnects and can run while the app is closed.
 
 ## Conventions
 

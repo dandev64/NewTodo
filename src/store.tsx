@@ -54,7 +54,32 @@ export type Action =
   | { type: 'gcal/unlink'; id: string }
   | { type: 'gcal/deleted'; eventId: string }
   | { type: 'settings/update'; patch: Partial<Settings> }
+  /** Merge records pulled from the cloud (see lib/cloudSync.ts). */
+  | {
+      type: 'sync/apply';
+      goals: GoalRecord[];
+      todos: Todo[];
+      deleteGoals: string[];
+      deleteTodos: string[];
+      settings?: Settings;
+    }
+  /** Replace local data with the account's data (first sign-in on a device with no todos). */
+  | { type: 'sync/replace'; goals: GoalRecord[]; todos: Todo[]; settings?: Settings }
+  /** Signed out: drop local data without touching Google Calendar. */
+  | { type: 'sync/clear' }
   | { type: 'reset' };
+
+/** A category as stored in the cloud: `pos` carries its place in the list. */
+export type GoalRecord = Goal & { pos?: number };
+
+/** Order categories by their synced position (ties broken by id so every device agrees). */
+function orderGoals(entries: { goal: Goal; pos: number }[]): Goal[] {
+  return entries
+    .sort((a, b) => a.pos - b.pos || (a.goal.id < b.goal.id ? -1 : a.goal.id > b.goal.id ? 1 : 0))
+    .map((e) => e.goal);
+}
+
+const stripPos = ({ pos: _pos, ...goal }: GoalRecord): Goal => goal;
 
 function nextOrder(todos: Todo[], goalId: string, date: string) {
   let max = -1;
@@ -279,6 +304,39 @@ function reducer(state: State, action: Action): State {
       return { ...state, gcalDeletes: (state.gcalDeletes ?? []).filter((id) => id !== action.eventId) };
     case 'settings/update':
       return { ...state, settings: { ...state.settings, ...action.patch } };
+
+    case 'sync/apply': {
+      const incoming = new Map(action.goals.map((g) => [g.id, g]));
+      const dropGoals = new Set(action.deleteGoals);
+      const entries = state.goals
+        .filter((g) => !dropGoals.has(g.id) && !incoming.has(g.id))
+        .map((g) => ({ goal: g, pos: state.goals.indexOf(g) }));
+      for (const g of incoming.values()) {
+        if (!dropGoals.has(g.id)) entries.push({ goal: stripPos(g), pos: g.pos ?? Number.MAX_SAFE_INTEGER });
+      }
+      const incomingTodos = new Map(action.todos.map((t) => [t.id, t]));
+      const dropTodos = new Set(action.deleteTodos);
+      const todos = state.todos
+        .filter((t) => !dropTodos.has(t.id))
+        .map((t) => incomingTodos.get(t.id) ?? t);
+      const known = new Set(todos.map((t) => t.id));
+      for (const t of incomingTodos.values()) if (!known.has(t.id) && !dropTodos.has(t.id)) todos.push(t);
+      return {
+        ...state,
+        goals: orderGoals(entries),
+        todos,
+        settings: action.settings ?? state.settings,
+      };
+    }
+    case 'sync/replace':
+      return {
+        ...state,
+        goals: orderGoals(action.goals.map((g, i) => ({ goal: stripPos(g), pos: g.pos ?? i }))),
+        todos: action.todos,
+        settings: action.settings ?? state.settings,
+      };
+    case 'sync/clear':
+      return initialState();
 
     case 'reset':
       // Also remove the events this device put in Google Calendar.

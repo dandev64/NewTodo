@@ -1,11 +1,15 @@
 import { useStore } from '../store';
 import { addDays, todayKey } from '../lib/date';
-import { connectGoogle, disconnectGoogle, useGoogleAuth } from '../lib/google';
+import { connectGoogle, disconnectGoogle, signInWithGoogleRedirect, useGoogleAuth } from '../lib/google';
+import { useAccount, type SyncStatus } from '../lib/account';
+import { signOut } from '../lib/cloudSync';
 import { gcalState } from '../lib/gcalSync';
 
 export function MyPage() {
   const { state, dispatch } = useStore();
   const google = useGoogleAuth();
+  const account = useAccount();
+  const user = account.session?.user;
   const goalsById = new Map(state.goals.map((g) => [g.id, g]));
   const pendingCount =
     state.todos.filter((t) => gcalState(t, goalsById.get(t.goalId)) === 'pending').length +
@@ -43,11 +47,45 @@ export function MyPage() {
       </header>
 
       <div className="profile">
-        <div className="avatar">🙂</div>
-        <div>
-          <div className="profile-name">Me</div>
-          <div className="muted">Stored on this device</div>
+        <div className="avatar">
+          {user?.picture ? <img src={user.picture} alt="" referrerPolicy="no-referrer" /> : user ? initial(user) : '🙂'}
         </div>
+        <div className="profile-text">
+          <div className="profile-name">{user ? user.name ?? user.email : 'Not signed in'}</div>
+          <div className="muted">
+            {account.signingIn
+              ? 'Signing in…'
+              : account.session?.expired
+                ? 'Signed out on the server. Sign in again to sync.'
+                : user
+                  ? `${user.email} · ${syncLabel(account.status)}`
+                  : 'Only on this device'}
+          </div>
+        </div>
+      </div>
+      <div className="account-actions">
+        {!user || account.session?.expired ? (
+          <>
+            <button
+              className="btn primary google-btn"
+              disabled={!google.configured || account.signingIn}
+              onClick={signInWithGoogleRedirect}
+            >
+              <span className="gcal-logo" /> Sign in with Google
+            </button>
+            <p className="hint">Use the same account on your phone and computer. Your todos sync between them.</p>
+          </>
+        ) : (
+          <button
+            className="pill-btn"
+            onClick={() =>
+              confirm('Sign out on this device? Your todos stay in your account and come back when you sign in again.') &&
+              signOut()
+            }
+          >
+            Sign out
+          </button>
+        )}
       </div>
 
       <div className="stats">
@@ -117,7 +155,11 @@ export function MyPage() {
         <li>
           <button
             className="link-danger"
-            onClick={() => confirm('Delete all categories and todos on this device?') && dispatch({ type: 'reset' })}
+            onClick={() => confirm(
+                user
+                  ? 'Delete all categories and todos? This also deletes them from your account on your other devices.'
+                  : 'Delete all categories and todos on this device?',
+              ) && dispatch({ type: 'reset' })}
           >
             Reset all data
           </button>
@@ -134,4 +176,14 @@ function Stat({ label, value }: { label: string; value: number }) {
       <div className="stat-label">{label}</div>
     </div>
   );
+}
+
+const initial = (u: { name?: string; email: string }) => (u.name ?? u.email).trim().charAt(0).toUpperCase();
+
+function syncLabel(status: SyncStatus): string {
+  if (status.state === 'offline') return 'Offline, will sync later';
+  if (status.state === 'error') return `Sync problem: ${status.error}`;
+  if (!status.lastSyncAt) return 'Syncing…';
+  const secs = Math.round((Date.now() - status.lastSyncAt) / 1000);
+  return secs < 60 ? 'Synced just now' : `Synced ${Math.round(secs / 60)} min ago`;
 }

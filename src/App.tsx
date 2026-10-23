@@ -5,6 +5,8 @@ import { CategoriesPage } from './pages/CategoriesPage';
 import { MyPage } from './pages/MyPage';
 import { BoardIcon, HomeIcon, TagIcon, UserIcon } from './components/icons';
 import { useGoogleSync } from './lib/gcalSync';
+import { useCloudSync } from './lib/cloudSync';
+import { dismissAccountError, useAccount } from './lib/account';
 import './App.css';
 
 type Tab = 'home' | 'board' | 'categories' | 'my';
@@ -20,6 +22,8 @@ export default function App({ notice }: { notice?: string | null }) {
   const [tab, setTab] = useState<Tab>('home');
   const [banner, setBanner] = useState(notice ?? null);
   useGoogleSync();
+  useCloudSync();
+  const account = useAccount();
 
   return (
     <div className="app">
@@ -27,6 +31,12 @@ export default function App({ notice }: { notice?: string | null }) {
         <div className="banner" role="alert">
           <span>{banner}</span>
           <button onClick={() => setBanner(null)} aria-label="Dismiss">✕</button>
+        </div>
+      )}
+      {account.error && (
+        <div className="banner" role="alert">
+          <span>{account.error}</span>
+          <button onClick={dismissAccountError} aria-label="Dismiss">✕</button>
         </div>
       )}
       <main className="content">
