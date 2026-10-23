@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Goal, Todo, TodoStatus } from '../types';
 import { useStore } from '../store';
-import { formatLong, relativeLabel, todayKey, weekOf } from '../lib/date';
+import { formatHM, formatLong, relativeLabel, todayKey, weekOf } from '../lib/date';
 import { STATUSES, statusOf } from '../lib/status';
 import { TodoSheet, type SheetMode } from '../components/TodoSheets';
 import { TodoFormSheet } from '../components/TodoFormSheet';
@@ -206,7 +206,11 @@ function Card({ todo, goal, overdue, dragging, onOpen, onAdvance, onDragStart, o
         </div>
         <div className="kcard-meta">
           <span style={{ color: goal.color }}>{goal.title}</span>
-          <span className={overdue ? 'overdue' : ''}>{overdue ? `Overdue · ${relativeLabel(todo.date)}` : relativeLabel(todo.date)}</span>
+          <span className={overdue ? 'overdue' : ''}>
+            {overdue ? `Overdue · ${relativeLabel(todo.date)}` : relativeLabel(todo.date)}
+            {todo.time && ` · ${formatHM(todo.time)}`}
+          </span>
+          {todo.gcal && <span className="gcal-badge">Google</span>}
         </div>
       </div>
       {next && (

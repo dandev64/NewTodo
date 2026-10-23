@@ -20,6 +20,19 @@ export type TodoSource = 'local' | 'google' | 'microsoft';
 /** Kanban column. Derived from `done` + `inProgress`; see lib/status.ts. */
 export type TodoStatus = 'todo' | 'doing' | 'done';
 
+/**
+ * Present when the todo should appear in Google Calendar. The sync engine
+ * (lib/gcalSync.ts) creates/updates the event whenever `syncedSig` is stale.
+ */
+export type TodoGcal = {
+  eventId?: string;
+  /** Signature of the event content last written to Google. */
+  syncedSig?: string;
+  error?: string;
+  /** Signature that produced `error`; we don't retry until the todo changes. */
+  errorSig?: string;
+};
+
 export type Todo = {
   id: string;
   goalId: string;
@@ -34,13 +47,27 @@ export type Todo = {
   /** Shared by every instance generated from the same repeat rule. */
   seriesId?: string;
   repeat?: RepeatRule;
-  /** Reserved for calendar sync (Google Calendar / Microsoft). */
+  /** Start time, HH:MM (24h). Absent = an all-day / anytime task. */
+  time?: string;
+  /** Minutes; only used with `time`. */
+  duration?: number;
+  /** Where the todo came from. `google` = imported from a Google Calendar event (`externalId` = event id). */
   source?: TodoSource;
   externalId?: string;
+  /** Pushed to Google Calendar. */
+  gcal?: TodoGcal;
+};
+
+export type Settings = {
+  /** Put newly created todos in Google Calendar automatically. */
+  autoGcal?: boolean;
 };
 
 export type State = {
   version: 1;
   goals: Goal[];
   todos: Todo[];
+  /** Google event ids still to be deleted (outbox, processed when signed in). */
+  gcalDeletes?: string[];
+  settings?: Settings;
 };

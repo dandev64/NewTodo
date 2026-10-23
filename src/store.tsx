@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useReducer, type Dispatch, type ReactNode } from 'react';
-import type { Goal, RepeatRule, State, Todo, TodoSource, TodoStatus } from './types';
+import type { Goal, RepeatRule, Settings, State, Todo, TodoSource, TodoStatus } from './types';
 import { repeatDates } from './lib/date';
 import { statusFields } from './lib/status';
 
@@ -35,6 +35,13 @@ export type Action =
   | { type: 'todo/move'; id: string; date: string }
   | { type: 'todo/copy'; id: string; date: string }
   | { type: 'todo/repeat'; id: string; rule: RepeatRule | null }
+  /** Set the time (null = all day) and whether the todo is in Google Calendar. */
+  | { type: 'todo/schedule'; id: string; time: string | null; duration: number; gcal: boolean }
+  | { type: 'gcal/synced'; id: string; eventId: string; sig: string }
+  | { type: 'gcal/error'; id: string; sig: string; message: string }
+  | { type: 'gcal/unlink'; id: string }
+  | { type: 'gcal/deleted'; eventId: string }
+  | { type: 'settings/update'; patch: Partial<Settings> }
   | { type: 'reset' };
 
 function nextOrder(todos: Todo[], goalId: string, date: string) {
@@ -42,6 +49,24 @@ function nextOrder(todos: Todo[], goalId: string, date: string) {
   for (const t of todos) if (t.goalId === goalId && t.date === date) max = Math.max(max, t.order);
   return max + 1;
 }
+
+/** Remove todos and queue deletion of any Google events they were linked to. */
+function removeTodos(state: State, keep: (t: Todo) => boolean, todos = state.todos): State {
+  const removed = todos.filter((t) => !keep(t));
+  const eventIds = removed.flatMap((t) => (t.gcal?.eventId ? [t.gcal.eventId] : []));
+  return {
+    ...state,
+    todos: todos.filter(keep),
+    gcalDeletes: eventIds.length ? [...(state.gcalDeletes ?? []), ...eventIds] : state.gcalDeletes,
+  };
+}
+
+/** Fields a copy/repeat instance inherits from its source todo. */
+const inherited = (src: Todo) => ({
+  time: src.time,
+  duration: src.duration,
+  gcal: src.gcal ? {} : undefined,
+});
 
 function initialState(): State {
   const now = Date.now();
@@ -84,9 +109,8 @@ function reducer(state: State, action: Action): State {
       return { ...state, goals: state.goals.map((g) => (g.id === action.id ? { ...g, ...action.patch } : g)) };
     case 'goal/delete':
       return {
-        ...state,
+        ...removeTodos(state, (t) => t.goalId !== action.id),
         goals: state.goals.filter((g) => g.id !== action.id),
-        todos: state.todos.filter((t) => t.goalId !== action.id),
       };
 
     case 'todo/add': {
@@ -100,6 +124,8 @@ function reducer(state: State, action: Action): State {
         createdAt: Date.now(),
         source: action.source ?? 'local',
         externalId: action.externalId,
+        // Imported events are already in Google, so never push those back.
+        gcal: state.settings?.autoGcal && action.source !== 'google' ? {} : undefined,
       };
       return { ...state, todos: [...state.todos, todo] };
     }
@@ -116,16 +142,14 @@ function reducer(state: State, action: Action): State {
     case 'todo/setStatus':
       return mapTodo(action.id, (t) => ({ ...t, ...statusFields(action.status) }));
     case 'todo/delete':
-      return { ...state, todos: state.todos.filter((t) => t.id !== action.id) };
+      return removeTodos(state, (t) => t.id !== action.id);
     case 'todo/deleteFollowing': {
       const src = state.todos.find((t) => t.id === action.id);
       if (!src) return state;
-      return {
-        ...state,
-        todos: state.todos.filter(
-          (t) => t.id !== src.id && !(src.seriesId && t.seriesId === src.seriesId && t.date >= src.date),
-        ),
-      };
+      return removeTodos(
+        state,
+        (t) => t.id !== src.id && !(src.seriesId && t.seriesId === src.seriesId && t.date >= src.date),
+      );
     }
     case 'todo/move':
       return mapTodo(action.id, (t) => ({
@@ -145,6 +169,7 @@ function reducer(state: State, action: Action): State {
         order: nextOrder(state.todos, src.goalId, action.date),
         createdAt: Date.now(),
         source: 'local',
+        ...inherited(src),
       };
       return { ...state, todos: [...state.todos, copy] };
     }
@@ -154,12 +179,14 @@ function reducer(state: State, action: Action): State {
       const { rule } = action;
       const oldSeries = src.seriesId;
       // Drop unfinished future instances of the old series; they get regenerated below.
-      let todos = state.todos.filter(
+      const pruned = removeTodos(
+        state,
         (t) => !(oldSeries && t.seriesId === oldSeries && t.id !== src.id && t.date > src.date && !t.done),
       );
+      let todos = pruned.todos;
       if (!rule) {
         return {
-          ...state,
+          ...pruned,
           todos: todos.map((t) =>
             t.id === src.id || (oldSeries && t.seriesId === oldSeries)
               ? { ...t, repeat: undefined, seriesId: undefined }
@@ -183,12 +210,42 @@ function reducer(state: State, action: Action): State {
           seriesId,
           repeat: rule,
           source: 'local',
+          ...inherited(src),
         });
       }
-      return { ...state, todos };
+      return { ...pruned, todos };
     }
+
+    case 'todo/schedule': {
+      const src = state.todos.find((t) => t.id === action.id);
+      if (!src) return state;
+      const next = mapTodo(action.id, (t) => ({
+        ...t,
+        time: action.time ?? undefined,
+        duration: action.time ? action.duration : undefined,
+        gcal: action.gcal ? (t.gcal ?? {}) : undefined,
+      }));
+      const unlinked = !action.gcal && src.gcal?.eventId;
+      return unlinked ? { ...next, gcalDeletes: [...(state.gcalDeletes ?? []), src.gcal!.eventId!] } : next;
+    }
+    case 'gcal/synced':
+      return mapTodo(action.id, (t) =>
+        t.gcal ? { ...t, gcal: { eventId: action.eventId, syncedSig: action.sig } } : t,
+      );
+    case 'gcal/error':
+      return mapTodo(action.id, (t) =>
+        t.gcal ? { ...t, gcal: { ...t.gcal, error: action.message, errorSig: action.sig } } : t,
+      );
+    case 'gcal/unlink':
+      return mapTodo(action.id, (t) => ({ ...t, gcal: undefined }));
+    case 'gcal/deleted':
+      return { ...state, gcalDeletes: (state.gcalDeletes ?? []).filter((id) => id !== action.eventId) };
+    case 'settings/update':
+      return { ...state, settings: { ...state.settings, ...action.patch } };
+
     case 'reset':
-      return initialState();
+      // Also remove the events this device put in Google Calendar.
+      return { ...initialState(), gcalDeletes: removeTodos(state, () => false).gcalDeletes };
   }
 }
 

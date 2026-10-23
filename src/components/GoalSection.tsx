@@ -1,6 +1,7 @@
 import type { Goal, Todo } from '../types';
 import { useStore } from '../store';
-import { CheckIcon, MoreIcon, PlusIcon, RepeatIcon } from './icons';
+import { formatHM } from '../lib/date';
+import { CalendarIcon, CheckIcon, MoreIcon, PlusIcon, RepeatIcon } from './icons';
 import { TodoInput } from './TodoInput';
 
 type Props = {
@@ -52,10 +53,16 @@ export function GoalSection({
                 {!todo.done && todo.inProgress && <span className="check-doing" style={{ background: goal.color }} />}
               </button>
               <span className="todo-title" onClick={() => onOpenActions(todo)}>
+                {todo.time && <span className="todo-time">{formatHM(todo.time)}</span>}
                 {todo.title}
                 {todo.repeat && (
                   <span className="todo-badge" title="Repeats">
                     <RepeatIcon size={11} strokeWidth={2.5} />
+                  </span>
+                )}
+                {todo.gcal && (
+                  <span className="todo-badge gcal-badge" title="In Google Calendar">
+                    <CalendarIcon size={11} strokeWidth={2.5} />
                   </span>
                 )}
               </span>

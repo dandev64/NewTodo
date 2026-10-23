@@ -4,6 +4,7 @@ import { BoardPage } from './pages/BoardPage';
 import { GoalsPage } from './pages/GoalsPage';
 import { MyPage } from './pages/MyPage';
 import { BoardIcon, FlagIcon, HomeIcon, UserIcon } from './components/icons';
+import { useGoogleSync } from './lib/gcalSync';
 import './App.css';
 
 type Tab = 'home' | 'board' | 'goals' | 'my';
@@ -18,6 +19,7 @@ const TABS: { id: Tab; label: string; icon: typeof HomeIcon }[] = [
 export default function App({ notice }: { notice?: string | null }) {
   const [tab, setTab] = useState<Tab>('home');
   const [banner, setBanner] = useState(notice ?? null);
+  useGoogleSync();
 
   return (
     <div className="app">

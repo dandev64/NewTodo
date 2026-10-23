@@ -16,7 +16,8 @@ Owner preferences (decided in conversation, don't re-litigate without asking):
   explicitly not wanted.**
 - Kanban: a **built-in board** (not an external tool) was chosen; external board sync (Microsoft Planner is the
   suggested fit) is deferred to the Microsoft OAuth phase.
-- Google Calendar v1 is **read-only**. Pushing todos to Google is the next planned step.
+- Google Calendar: events show on Home (import as todo), and todos can be **pushed to Google** per todo
+  ("Time & Google Calendar" sheet: all-day or a set time + duration), with an optional "add new todos automatically" setting.
 - Use a **personal Google account** for the Google Cloud project, not the work account.
 
 ## Commands
@@ -50,6 +51,7 @@ src/
   lib/date.ts           Date-key helpers (YYYY-MM-DD local dates), month/week grids, repeat date generation.
   lib/status.ts         Kanban status ↔ (done, inProgress) mapping.
   lib/google.ts         Google OAuth (redirect implicit flow), token store (useSyncExternalStore), events API.
+  lib/gcalSync.ts       Todo → Google event mapping + useGoogleSync() engine (mounted in App).
   pages/
     HomePage.tsx        Calendar + Google events section + goals with todos (the Todo Mate main screen).
     BoardPage.tsx       Kanban: To do / In progress / Done, range + goal filters, drag & drop, quick-advance button.
@@ -62,6 +64,7 @@ src/
     TodoSheets.tsx      Bottom-sheet actions for a todo: status switch, edit, delete, tomorrow, copy, move, repeat.
     TodoFormSheet.tsx   Full create/edit form (title, goal, date). Used by Board and Google "import as todo".
     GoogleEvents.tsx    useMonthEvents() hook + the Google section on Home.
+    (TodoSheets.tsx also holds ScheduleForm — time/duration + "Show in Google Calendar".)
     DatePicker.tsx      Month picker used by "Change date" / "Do another day".
     BottomSheet.tsx     Modal sheet (backdrop click / Esc closes).
     icons.tsx           Inline SVG icons.
@@ -82,6 +85,9 @@ public/
 - `Todo.source` (`local` | `google` | `microsoft`) + `Todo.externalId` link a todo to a calendar event.
   Google-imported todos have `source: 'google'`, `externalId: <event id>` (unique per recurring instance because
   events are fetched with `singleEvents=true`).
+- `Todo.time` (`HH:MM`, absent = all day) + `Todo.duration` (minutes). `Todo.gcal` present = mirrored to Google
+  (`eventId`, `syncedSig`, `error`/`errorSig`). `State.gcalDeletes` is an outbox of event ids to delete;
+  `State.settings.autoGcal` auto-links new todos. Copies/repeats inherit time, duration and the gcal flag.
 - `State.version` is `1`. If you change the shape incompatibly, bump it and migrate in `load()` in `store.tsx` —
   users have real data in localStorage.
 
@@ -91,7 +97,8 @@ public/
   (`response_type=token`). Redirect, not popup, because popups are unreliable inside an iOS home-screen PWA.
   `handleGoogleRedirect()` runs in `main.tsx` before React renders, validates `state` (CSRF), stores the token,
   and strips the hash from the URL.
-- **Scope:** `calendar.events.readonly`. Writing events later needs `calendar.events` → users must reconnect once.
+- **Scope:** `calendar.events` (read + write). The granted `scope` from the redirect is stored; `canWrite` is false for
+  older read-only connections → UI shows **Allow adding events** (reconnect). A 403 "insufficient" also clears it.
 - **Redirect URI** is `${location.origin}/`. Every origin the app runs on (localhost:5173, the deployed URL) must be
   added to the Google Cloud OAuth client under both *Authorized JavaScript origins* and *Authorized redirect URIs*
   (redirect URI with trailing slash).
@@ -102,6 +109,15 @@ public/
 - **Fetching:** `listMonthEvents(token, 'YYYY-MM')` gets the primary calendar for the month ±1 week, paginated,
   cancelled events dropped. `useMonthEvents` caches per month per token; Refresh clears the cache.
 - All-day event `end.date` is exclusive; `GEvent.days` lists every local date an event touches.
+- **Push sync (lib/gcalSync.ts):** `buildEvent()` maps a todo to an event (summary gets a `✓ ` prefix when done;
+  goal color → nearest Google `colorId`; `extendedProperties.private.todomateId` tags it). A signature of the event
+  content is compared with `gcal.syncedSig`; stale → POST (no `eventId`) or PATCH. Failures store `error`+`errorSig`
+  and only retry when the todo changes (plus once per app session). 404/410 or a `cancelled` response = deleted in
+  Google → the todo is unlinked (we don't resurrect it). Deletions go through `gcalDeletes`.
+  Events tagged with `todomateId` are filtered out of the Home events list so they don't show twice.
+- **PATCH merges nested objects.** Switching all-day ↔ timed must send `null` for the other form
+  (`date: null` / `dateTime: null, timeZone: null`), otherwise Google returns 400 "Invalid start time". Nulls are
+  stripped from POST bodies. (This bug shipped once — keep it.)
 - Google Cloud project is in **Testing** mode → only listed test users can sign in, and users see
   "Google hasn't verified this app" → Continue. That's expected for personal use.
 
@@ -132,13 +148,13 @@ page — go to `about:blank` first when simulating an OAuth return.
 - Board drag & drop uses HTML5 DnD → desktop only; on touch use the ▶ / ✓ quick button or the status switch.
 - Editing a repeating todo's title only changes that one instance.
 - Data is local to each browser/device. "All" on the Board can get long with big repeat series.
-- Google is read-only and primary-calendar only; imported todos don't update if the event changes.
+- Google: primary calendar only; imported todos don't update if the event changes; edits made to a pushed event
+  in Google are overwritten the next time the todo changes (app → Google is one-way). Sync only runs while the app
+  is open and signed in (~1h tokens).
 
 ## Roadmap / next steps (in rough order)
 
 1. Add the Vercel URL to the Google OAuth client (origins + redirect URI) and `VITE_GOOGLE_CLIENT_ID` to Vercel env vars.
-2. **Push todos → Google Calendar** (scope `calendar.events`; create/update/delete events for linked todos; decide
-   all-day vs. timed; use `extendedProperties.private` to tag events created by the app).
 3. **Microsoft**: Outlook calendar (and Teams meetings, which live there) via Microsoft Graph with MSAL; possibly
    Microsoft Planner as an external Kanban. Work/tenant accounts may require admin consent.
 4. Probably a small **backend** (refresh tokens, cross-device sync) once integrations are two-way.

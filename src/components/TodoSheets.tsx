@@ -1,13 +1,15 @@
 import { useState, type ReactNode } from 'react';
 import type { Goal, RepeatFreq, Todo } from '../types';
 import { useStore } from '../store';
-import { WEEKDAY_SHORT, addDays, formatLong, fromKey, todayKey } from '../lib/date';
+import { WEEKDAY_SHORT, addDays, formatHM, formatLong, fromKey, todayKey } from '../lib/date';
+import { connectGoogle, useGoogleAuth } from '../lib/google';
+import { DEFAULT_DURATION, gcalState } from '../lib/gcalSync';
 import { STATUSES, statusOf } from '../lib/status';
 import { BottomSheet } from './BottomSheet';
 import { DatePicker } from './DatePicker';
-import { ArrowRightIcon, CalendarIcon, CopyIcon, EditIcon, RepeatIcon, TrashIcon } from './icons';
+import { ArrowRightIcon, CalendarIcon, ChevronRight, ClockIcon, CopyIcon, EditIcon, RepeatIcon, TrashIcon } from './icons';
 
-export type SheetMode = 'actions' | 'move' | 'copy' | 'repeat' | 'delete';
+export type SheetMode = 'actions' | 'move' | 'copy' | 'repeat' | 'delete' | 'schedule';
 
 type Props = {
   todo: Todo;
@@ -49,6 +51,14 @@ export function TodoSheet({ todo, goal, mode, setMode, onEdit, onClose }: Props)
     return (
       <BottomSheet title="Repeat" onClose={onClose}>
         <RepeatForm todo={todo} onDone={onClose} />
+      </BottomSheet>
+    );
+  }
+
+  if (mode === 'schedule') {
+    return (
+      <BottomSheet title="Time & Google Calendar" onClose={onClose}>
+        <ScheduleForm todo={todo} goal={goal} onDone={onClose} />
       </BottomSheet>
     );
   }
@@ -112,6 +122,15 @@ export function TodoSheet({ todo, goal, mode, setMode, onEdit, onClose }: Props)
         <Action icon={<CalendarIcon />} label="Change date" onClick={() => setMode('move')} />
         <Action icon={<RepeatIcon />} label="Repeat" onClick={() => setMode('repeat')} />
       </div>
+      <button className="sheet-row" onClick={() => setMode('schedule')}>
+        <ClockIcon size={18} />
+        <span className="sheet-row-label">Time & Google Calendar</span>
+        <span className="sheet-row-value">
+          {todo.time ? formatHM(todo.time) : 'All day'}
+          {todo.gcal && ' · In calendar'}
+        </span>
+        <ChevronRight size={16} />
+      </button>
     </BottomSheet>
   );
 }
@@ -185,6 +204,111 @@ function RepeatForm({ todo, onDone }: { todo: Todo; onDone: () => void }) {
           disabled={!valid}
           onClick={() => {
             dispatch({ type: 'todo/repeat', id: todo.id, rule: { freq, weekdays, until } });
+            onDone();
+          }}
+        >
+          Save
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const DURATIONS = [15, 30, 45, 60, 90, 120, 180];
+const durationLabel = (m: number) => (m < 60 ? `${m} min` : `${m / 60} hr`.replace('.5 hr', '½ hr'));
+
+function ScheduleForm({ todo, goal, onDone }: { todo: Todo; goal: Goal; onDone: () => void }) {
+  const { dispatch } = useStore();
+  const google = useGoogleAuth();
+  const [timed, setTimed] = useState(!!todo.time);
+  const [time, setTime] = useState(todo.time ?? '09:00');
+  const [duration, setDuration] = useState(todo.duration ?? DEFAULT_DURATION);
+  const [inCalendar, setInCalendar] = useState(!!todo.gcal);
+  const imported = todo.source === 'google';
+  const sync = gcalState(todo, goal);
+
+  // What (if anything) stands between the user and syncing.
+  const blocker = !google.configured
+    ? { text: 'Google Calendar is not set up for this app.' }
+    : !google.connected
+      ? { text: 'Connect Google Calendar to add todos to it.', action: 'Connect' }
+      : !google.valid
+        ? { text: 'Google session expired. Changes sync after you reconnect.', action: 'Reconnect' }
+        : !google.canWrite
+          ? { text: 'Google only allows viewing events right now.', action: 'Allow adding events' }
+          : null;
+
+  return (
+    <div className="repeat-form">
+      <div className="segmented">
+        <button className={!timed ? 'active' : ''} onClick={() => setTimed(false)}>All day</button>
+        <button className={timed ? 'active' : ''} onClick={() => setTimed(true)}>Set time</button>
+      </div>
+
+      {timed && (
+        <>
+          <label className="field">
+            <span>Starts</span>
+            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Duration</span>
+            <select value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
+              {DURATIONS.map((m) => (
+                <option key={m} value={m}>{durationLabel(m)}</option>
+              ))}
+            </select>
+          </label>
+        </>
+      )}
+
+      {imported ? (
+        <p className="hint">This todo came from a Google Calendar event, so it's already in your calendar.</p>
+      ) : (
+        <>
+          <label className="field switch-field">
+            <span>
+              Show in Google Calendar
+              <span className="field-sub">
+                {timed ? 'As an event at this time' : 'As an all-day task'}
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              className="switch"
+              checked={inCalendar}
+              disabled={!google.connected && !inCalendar}
+              onChange={(e) => setInCalendar(e.target.checked)}
+            />
+          </label>
+          {todo.gcal && sync && (
+            <p className={`hint gcal-status ${sync}`}>
+              {sync === 'synced' && '✓ In your Google Calendar'}
+              {sync === 'pending' && 'Waiting to sync…'}
+              {sync === 'error' && `Couldn't sync: ${todo.gcal.error}`}
+            </p>
+          )}
+          {blocker && (inCalendar || !google.connected) && (
+            <div className="gcal-expired">
+              <span>{blocker.text}</span>
+              {blocker.action && <button className="pill-btn" onClick={connectGoogle}>{blocker.action}</button>}
+            </div>
+          )}
+        </>
+      )}
+
+      <div className="sheet-buttons">
+        <button
+          className="btn primary"
+          disabled={timed && !time}
+          onClick={() => {
+            dispatch({
+              type: 'todo/schedule',
+              id: todo.id,
+              time: timed ? time : null,
+              duration,
+              gcal: !imported && inCalendar,
+            });
             onDone();
           }}
         >

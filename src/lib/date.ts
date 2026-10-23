@@ -59,6 +59,12 @@ export function relativeLabel(key: string): string {
   return formatLong(key);
 }
 
+/** "14:05" → "2:05 PM". */
+export function formatHM(hm: string): string {
+  const [h, m] = hm.split(':').map(Number);
+  return new Date(2000, 0, 1, h, m).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
 const MAX_REPEATS = 400;
 
 /** Dates strictly after `start` up to `rule.until` that match the rule. */

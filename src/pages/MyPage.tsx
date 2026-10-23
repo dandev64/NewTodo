@@ -1,10 +1,15 @@
 import { useStore } from '../store';
 import { addDays, todayKey } from '../lib/date';
 import { connectGoogle, disconnectGoogle, useGoogleAuth } from '../lib/google';
+import { gcalState } from '../lib/gcalSync';
 
 export function MyPage() {
   const { state, dispatch } = useStore();
   const google = useGoogleAuth();
+  const goalsById = new Map(state.goals.map((g) => [g.id, g]));
+  const pendingCount =
+    state.todos.filter((t) => gcalState(t, goalsById.get(t.goalId)) === 'pending').length +
+    (state.gcalDeletes?.length ?? 0);
   const done = state.todos.filter((t) => t.done).length;
   const remaining = state.todos.length - done;
 
@@ -60,7 +65,8 @@ export function MyPage() {
               {!google.configured
                 ? 'Add VITE_GOOGLE_CLIENT_ID to .env.local'
                 : google.connected
-                  ? (google.calendarName ?? 'Connected') + (google.valid ? '' : ' · session expired')
+                  ? (google.calendarName ?? 'Connected') +
+                    (!google.valid ? ' · session expired' : !google.canWrite ? ' · view only' : '')
                   : 'Show your events on Home'}
             </div>
           </div>
@@ -70,11 +76,30 @@ export function MyPage() {
           {google.connected && (
             <span className="settings-actions">
               {!google.valid && <button className="pill-btn" onClick={connectGoogle}>Reconnect</button>}
+              {google.valid && !google.canWrite && (
+                <button className="pill-btn" onClick={connectGoogle}>Allow adding events</button>
+              )}
               <button className="pill-btn" onClick={disconnectGoogle}>Disconnect</button>
             </span>
           )}
           {!google.configured && <span className="badge">Setup needed</span>}
         </li>
+        {google.connected && (
+          <li>
+            <div>
+              <div>Add new todos automatically</div>
+              <div className="muted">
+                {pendingCount > 0 ? `${pendingCount} change${pendingCount > 1 ? 's' : ''} waiting to sync` : 'All-day unless you set a time'}
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              className="switch"
+              checked={!!state.settings?.autoGcal}
+              onChange={(e) => dispatch({ type: 'settings/update', patch: { autoGcal: e.target.checked } })}
+            />
+          </li>
+        )}
         <li>
           <span>Microsoft Outlook / Teams</span>
           <span className="badge">Coming soon</span>

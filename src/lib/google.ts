@@ -1,4 +1,4 @@
-// Google Calendar (read-only) using the browser-only OAuth token flow.
+// Google Calendar (read + write) using the browser-only OAuth token flow.
 // We use a full-page redirect rather than a popup because popups are unreliable
 // inside an iOS home-screen web app. Tokens last ~1 hour and there is no refresh
 // token without a backend, so an expired session shows a one-tap "Reconnect".
@@ -6,15 +6,20 @@ import { useSyncExternalStore } from 'react';
 import { addDays, toKey } from './date';
 
 export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
-const SCOPE = 'https://www.googleapis.com/auth/calendar.events.readonly';
+/** Read and write events. Older connections only granted `.readonly`; see `canWrite`. */
+const SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 const AUTH_KEY = 'todomate.google';
 const STATE_KEY = 'todomate.google.oauthState';
 const API = 'https://www.googleapis.com/calendar/v3';
+/** Private extended property that marks events created from a todo. */
+export const TODO_ID_PROP = 'todomateId';
 
 type GoogleAuth = {
   accessToken?: string;
   expiresAt?: number;
   calendarName?: string;
+  /** Space-separated scopes Google granted with the current token. */
+  scope?: string;
 };
 
 export type GEvent = {
@@ -78,6 +83,8 @@ export function useGoogleAuth() {
     valid,
     token: valid ? a!.accessToken! : null,
     calendarName: a?.calendarName,
+    /** False for connections made before write access was added: they must reconnect once. */
+    canWrite: !!a?.scope?.split(' ').includes(SCOPE),
   };
 }
 
@@ -114,6 +121,7 @@ export function handleGoogleRedirect(): string | null {
     ...auth,
     accessToken: params.get('access_token')!,
     expiresAt: Date.now() + Number(params.get('expires_in') ?? 3600) * 1000,
+    scope: params.get('scope') ?? undefined,
   });
   return null;
 }
@@ -133,15 +141,83 @@ export function disconnectGoogle() {
 // ---------- API ----------
 
 export class GoogleAuthExpired extends Error {}
+/** The event no longer exists (deleted in Google Calendar). */
+export class GoogleEventGone extends Error {}
+
+/** `null` explicitly clears a field: PATCH merges nested objects, so switching all-day ↔ timed must null the other form. */
+type EventTime = { date?: string | null; dateTime?: string | null; timeZone?: string | null };
 
 type ApiEvent = {
   id: string;
   status?: string;
   summary?: string;
   htmlLink?: string;
-  start: { date?: string; dateTime?: string };
-  end: { date?: string; dateTime?: string };
+  start: EventTime;
+  end: EventTime;
+  extendedProperties?: { private?: Record<string, string> };
 };
+
+export type EventInput = {
+  summary: string;
+  description?: string;
+  start: EventTime;
+  end: EventTime;
+  colorId?: string;
+  extendedProperties?: { private?: Record<string, string> };
+};
+
+async function api(token: string, path: string, init: RequestInit = {}): Promise<Response> {
+  const res = await fetch(`${API}${path}`, {
+    ...init,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers },
+  });
+  if (res.status === 401) {
+    writeAuth({ ...auth, accessToken: undefined, expiresAt: undefined });
+    throw new GoogleAuthExpired('Google session expired');
+  }
+  if (res.status === 403) {
+    const body = await res.text();
+    if (body.includes('insufficient')) {
+      // Token lacks write scope: show "Allow adding events" instead of retrying forever.
+      writeAuth({ ...auth, scope: undefined });
+      throw new GoogleAuthExpired('Google Calendar write access is needed');
+    }
+    throw new Error(`Google Calendar error (403)`);
+  }
+  if (res.status === 404 || res.status === 410) throw new GoogleEventGone('Event not found');
+  if (!res.ok) {
+    let detail = '';
+    try {
+      detail = ((await res.json()) as { error?: { message?: string } }).error?.message ?? '';
+    } catch {
+      // non-JSON error body
+    }
+    throw new Error(`Google Calendar error (${res.status})${detail ? `: ${detail}` : ''}`);
+  }
+  return res;
+}
+
+const PRIMARY = '/calendars/primary/events';
+
+/** Create (no id) or update an event on the primary calendar. Returns the event id. */
+export async function saveEvent(token: string, eventId: string | undefined, event: EventInput): Promise<string> {
+  // nulls only make sense for PATCH (clearing a merged field); leave them out of inserts.
+  const res = eventId
+    ? await api(token, `${PRIMARY}/${encodeURIComponent(eventId)}`, { method: 'PATCH', body: JSON.stringify(event) })
+    : await api(token, PRIMARY, { method: 'POST', body: JSON.stringify(event, (_k, v) => (v === null ? undefined : v)) });
+  const saved = (await res.json()) as ApiEvent;
+  // A PATCH on an event the user deleted in Google succeeds but stays cancelled.
+  if (saved.status === 'cancelled') throw new GoogleEventGone('Event was deleted in Google Calendar');
+  return saved.id;
+}
+
+export async function deleteEvent(token: string, eventId: string): Promise<void> {
+  try {
+    await api(token, `${PRIMARY}/${encodeURIComponent(eventId)}`, { method: 'DELETE' });
+  } catch (e) {
+    if (!(e instanceof GoogleEventGone)) throw e;
+  }
+}
 
 /** Events on the primary calendar for a month (plus a week either side). `month` is YYYY-MM. */
 export async function listMonthEvents(token: string, month: string): Promise<GEvent[]> {
@@ -158,14 +234,7 @@ export async function listMonthEvents(token: string, month: string): Promise<GEv
   let pageToken: string | undefined;
   for (let page = 0; page < 5; page++) {
     if (pageToken) base.set('pageToken', pageToken);
-    const res = await fetch(`${API}/calendars/primary/events?${base}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.status === 401) {
-      writeAuth({ ...auth, accessToken: undefined, expiresAt: undefined });
-      throw new GoogleAuthExpired('Google session expired');
-    }
-    if (!res.ok) throw new Error(`Google Calendar error (${res.status})`);
+    const res = await api(token, `${PRIMARY}?${base}`);
     const body = (await res.json()) as { items?: ApiEvent[]; nextPageToken?: string; summary?: string };
     items.push(...(body.items ?? []));
     if (body.summary && body.summary !== auth?.calendarName) writeAuth({ ...auth, calendarName: body.summary });
@@ -173,7 +242,10 @@ export async function listMonthEvents(token: string, month: string): Promise<GEv
     if (!pageToken) break;
   }
 
-  return items.filter((e) => e.status !== 'cancelled').map(toGEvent);
+  // Events created from todos are already shown as todos, so leave them out.
+  return items
+    .filter((e) => e.status !== 'cancelled' && !e.extendedProperties?.private?.[TODO_ID_PROP])
+    .map(toGEvent);
 }
 
 function toGEvent(e: ApiEvent): GEvent {
