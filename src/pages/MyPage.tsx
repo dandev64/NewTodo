@@ -66,7 +66,13 @@ export function MyPage() {
                 ? 'Add VITE_GOOGLE_CLIENT_ID to .env.local'
                 : google.connected
                   ? (google.calendarName ?? 'Connected') +
-                    (!google.valid ? ' · session expired' : !google.canWrite ? ' · view only' : '')
+                    (!google.valid
+                      ? ' · session expired'
+                      : !google.canWrite
+                        ? ' · view only'
+                        : !google.allCalendars
+                          ? ' · main calendar only'
+                          : '')
                   : 'Show your events on Home'}
             </div>
           </div>
@@ -76,8 +82,8 @@ export function MyPage() {
           {google.connected && (
             <span className="settings-actions">
               {!google.valid && <button className="pill-btn" onClick={connectGoogle}>Reconnect</button>}
-              {google.valid && !google.canWrite && (
-                <button className="pill-btn" onClick={connectGoogle}>Allow adding events</button>
+              {google.valid && (!google.canWrite || !google.allCalendars) && (
+                <button className="pill-btn" onClick={connectGoogle}>Update permissions</button>
               )}
               <button className="pill-btn" onClick={disconnectGoogle}>Disconnect</button>
             </span>

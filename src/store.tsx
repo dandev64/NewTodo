@@ -25,6 +25,8 @@ export type Action =
       /** Set when the todo was imported from a calendar event. */
       source?: TodoSource;
       externalId?: string;
+      time?: string;
+      duration?: number;
     }
   | { type: 'todo/rename'; id: string; title: string }
   | { type: 'todo/update'; id: string; patch: Pick<Todo, 'title' | 'goalId' | 'date'> }
@@ -37,7 +39,15 @@ export type Action =
   | { type: 'todo/repeat'; id: string; rule: RepeatRule | null }
   /** Set the time (null = all day) and whether the todo is in Google Calendar. */
   | { type: 'todo/schedule'; id: string; time: string | null; duration: number; gcal: boolean }
-  | { type: 'gcal/synced'; id: string; eventId: string; sig: string }
+  | { type: 'gcal/synced'; id: string; eventId: string; sig: string; at: number }
+  /** Apply an edit made to the todo's event in Google Calendar. */
+  | {
+      type: 'gcal/pulled';
+      id: string;
+      patch: Pick<Todo, 'title' | 'done' | 'date' | 'time' | 'duration'>;
+      sig: string;
+      at: number;
+    }
   | { type: 'gcal/error'; id: string; sig: string; message: string }
   | { type: 'gcal/unlink'; id: string }
   | { type: 'gcal/deleted'; eventId: string }
@@ -124,6 +134,8 @@ function reducer(state: State, action: Action): State {
         createdAt: Date.now(),
         source: action.source ?? 'local',
         externalId: action.externalId,
+        time: action.time,
+        duration: action.time ? action.duration : undefined,
         // Imported events are already in Google, so never push those back.
         gcal: state.settings?.autoGcal && action.source !== 'google' ? {} : undefined,
       };
@@ -230,7 +242,19 @@ function reducer(state: State, action: Action): State {
     }
     case 'gcal/synced':
       return mapTodo(action.id, (t) =>
-        t.gcal ? { ...t, gcal: { eventId: action.eventId, syncedSig: action.sig } } : t,
+        t.gcal ? { ...t, gcal: { eventId: action.eventId, syncedSig: action.sig, syncedAt: action.at } } : t,
+      );
+    case 'gcal/pulled':
+      return mapTodo(action.id, (t) =>
+        t.gcal
+          ? {
+              ...t,
+              ...action.patch,
+              inProgress: action.patch.done ? false : t.inProgress,
+              order: action.patch.date !== t.date ? nextOrder(state.todos, t.goalId, action.patch.date) : t.order,
+              gcal: { eventId: t.gcal.eventId, syncedSig: action.sig, syncedAt: action.at },
+            }
+          : t,
       );
     case 'gcal/error':
       return mapTodo(action.id, (t) =>

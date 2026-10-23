@@ -51,7 +51,8 @@ src/
   lib/date.ts           Date-key helpers (YYYY-MM-DD local dates), month/week grids, repeat date generation.
   lib/status.ts         Kanban status ↔ (done, inProgress) mapping.
   lib/google.ts         Google OAuth (redirect implicit flow), token store (useSyncExternalStore), events API.
-  lib/gcalSync.ts       Todo → Google event mapping + useGoogleSync() engine (mounted in App).
+  lib/gcalSync.ts       Todo ↔ Google event mapping + useGoogleSync() engine (mounted in App): push + pull.
+  lib/gcalPull.ts       Shared per-month events cache (useMonthEvents), focus/visibility + polling refresh.
   pages/
     HomePage.tsx        Calendar + Google events section + goals with todos (the Todo Mate main screen).
     BoardPage.tsx       Kanban: To do / In progress / Done, range + goal filters, drag & drop, quick-advance button.
@@ -63,7 +64,7 @@ src/
     TodoInput.tsx       Inline input (Enter = add & keep open, Esc/blur = close).
     TodoSheets.tsx      Bottom-sheet actions for a todo: status switch, edit, delete, tomorrow, copy, move, repeat.
     TodoFormSheet.tsx   Full create/edit form (title, goal, date). Used by Board and Google "import as todo".
-    GoogleEvents.tsx    useMonthEvents() hook + the Google section on Home.
+    GoogleEvents.tsx    The Google section on Home (re-exports useMonthEvents from lib/gcalPull).
     (TodoSheets.tsx also holds ScheduleForm — time/duration + "Show in Google Calendar".)
     DatePicker.tsx      Month picker used by "Change date" / "Do another day".
     BottomSheet.tsx     Modal sheet (backdrop click / Esc closes).
@@ -97,8 +98,11 @@ public/
   (`response_type=token`). Redirect, not popup, because popups are unreliable inside an iOS home-screen PWA.
   `handleGoogleRedirect()` runs in `main.tsx` before React renders, validates `state` (CSRF), stores the token,
   and strips the hash from the URL.
-- **Scope:** `calendar.events` (read + write). The granted `scope` from the redirect is stored; `canWrite` is false for
-  older read-only connections → UI shows **Allow adding events** (reconnect). A 403 "insufficient" also clears it.
+- **Scopes:** `calendar.events` (read + write events) + `calendar.calendarlist.readonly` (list calendars so events
+  from every calendar ticked in the user's Google sidebar are shown, each with its calendar color). The granted
+  `scope` from the redirect is stored; `canWrite` / `allCalendars` flags drive **Update permissions** /
+  **Show all calendars** prompts (one reconnect). Without the list scope only `primary` is read. A 403
+  "insufficient" clears the stored scope. Writes always go to `primary`.
 - **Redirect URI** is `${location.origin}/`. Every origin the app runs on (localhost:5173, the deployed URL) must be
   added to the Google Cloud OAuth client under both *Authorized JavaScript origins* and *Authorized redirect URIs*
   (redirect URI with trailing slash).
@@ -106,8 +110,13 @@ public/
   expiry and a 401 also drops it; the UI then shows **Reconnect** (one tap, usually no consent screen).
   Auth state lives in localStorage key `todomate.google` (`{accessToken?, expiresAt?, calendarName?}`);
   "connected but expired" = object present without `accessToken`.
-- **Fetching:** `listMonthEvents(token, 'YYYY-MM')` gets the primary calendar for the month ±1 week, paginated,
-  cancelled events dropped. `useMonthEvents` caches per month per token; Refresh clears the cache.
+- **Fetching:** `listMonthEvents(token, 'YYYY-MM')` reads all visible calendars for the month −6/+8 days
+  (paginated, cancelled dropped; one failing secondary calendar is skipped, primary failing fails the fetch) and
+  returns `{ events, appEvents, from, to }`: display events, plus events tagged with `todomateId` (ours) parsed back
+  into title/done/date/time/duration. The cache in `lib/gcalPull.ts` is module-level and shared; months on screen
+  (ref-counted) refetch on window focus / `visibilitychange` (if older than 3 s) and every 15 s tick once older than
+  60 s. App always keeps the current month active so pulls happen even off the Home tab. (A single 60 s interval
+  with a 55 s max-age once caused ~2 min gaps — keep tick ≪ max age.)
 - All-day event `end.date` is exclusive; `GEvent.days` lists every local date an event touches.
 - **Push sync (lib/gcalSync.ts):** `buildEvent()` maps a todo to an event (summary gets a `✓ ` prefix when done;
   goal color → nearest Google `colorId`; `extendedProperties.private.todomateId` tags it). A signature of the event
@@ -115,6 +124,12 @@ public/
   and only retry when the todo changes (plus once per app session). 404/410 or a `cancelled` response = deleted in
   Google → the todo is unlinked (we don't resurrect it). Deletions go through `gcalDeletes`.
   Events tagged with `todomateId` are filtered out of the Home events list so they don't show twice.
+- **Pull sync (Google → todo):** for each fetched month, linked todos in state `synced` whose `gcal.syncedAt` is
+  older than that fetch's `fetchStartedAt` are compared with their event (`pulledPatch`). Differences (renamed,
+  moved, retimed, `✓ ` added/removed) are applied via `gcal/pulled`, which also stores the new signature +
+  `syncedAt` so nothing is pushed back. Local unsynced edits (`pending`) always win. If the event is missing from a
+  window that covers the todo's date (and isn't now a recurring series), it was deleted in Google → the todo is
+  kept and unlinked. Imported todos (`source: 'google'`) are snapshots and don't update.
 - **PATCH merges nested objects.** Switching all-day ↔ timed must send `null` for the other form
   (`date: null` / `dateTime: null, timeZone: null`), otherwise Google returns 400 "Invalid start time". Nulls are
   stripped from POST bodies. (This bug shipped once — keep it.)
@@ -148,9 +163,9 @@ page — go to `about:blank` first when simulating an OAuth return.
 - Board drag & drop uses HTML5 DnD → desktop only; on touch use the ▶ / ✓ quick button or the status switch.
 - Editing a repeating todo's title only changes that one instance.
 - Data is local to each browser/device. "All" on the Board can get long with big repeat series.
-- Google: primary calendar only; imported todos don't update if the event changes; edits made to a pushed event
-  in Google are overwritten the next time the todo changes (app → Google is one-way). Sync only runs while the app
-  is open and signed in (~1h tokens).
+- Google: sync (both directions) only runs while the app is open and signed in (~1h tokens, no backend). Imported
+  todos are snapshots. Pushed events live on the primary calendar. Description/color/attendee edits in Google aren't
+  pulled (only title, done ✓, date, time, duration).
 
 ## Roadmap / next steps (in rough order)
 

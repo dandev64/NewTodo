@@ -103,7 +103,13 @@ export function HomePage({ onGoToGoals }: Props) {
       {importing && (
         <TodoFormSheet
           defaultDate={selected}
-          initial={{ title: importing.title, source: 'google', externalId: importing.id }}
+          initial={{
+            title: importing.title,
+            source: 'google',
+            externalId: importing.id,
+            time: importing.time,
+            duration: importing.duration,
+          }}
           onClose={() => setImporting(null)}
         />
       )}

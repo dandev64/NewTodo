@@ -7,7 +7,9 @@ import { addDays, toKey } from './date';
 
 export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 /** Read and write events. Older connections only granted `.readonly`; see `canWrite`. */
-const SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+const EVENTS_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+/** List the user's calendars, so events from all visible calendars (not just primary) are shown. */
+const CALENDARLIST_SCOPE = 'https://www.googleapis.com/auth/calendar.calendarlist.readonly';
 const AUTH_KEY = 'todomate.google';
 const STATE_KEY = 'todomate.google.oauthState';
 const API = 'https://www.googleapis.com/calendar/v3';
@@ -30,7 +32,32 @@ export type GEvent = {
   end: Date;
   /** Every local date (YYYY-MM-DD) the event touches. */
   days: string[];
+  /** Local start time HH:MM and length in minutes, for timed events. */
+  time?: string;
+  duration?: number;
   link?: string;
+  /** Background color of the calendar the event is on. */
+  color?: string;
+};
+
+/** An event the app created from a todo, as it currently looks in Google. */
+export type AppEvent = {
+  id: string;
+  recurringEventId?: string;
+  todoId: string;
+  title: string;
+  done: boolean;
+  date: string;
+  time?: string;
+  duration?: number;
+};
+
+export type MonthEvents = {
+  events: GEvent[];
+  appEvents: AppEvent[];
+  /** Date window covered by the fetch: [from, to). */
+  from: string;
+  to: string;
 };
 
 // ---------- connection state (shared across components) ----------
@@ -69,6 +96,10 @@ function scheduleExpiry() {
 }
 scheduleExpiry();
 
+export const currentToken = () => auth?.accessToken ?? null;
+
+const hasScope = (a: GoogleAuth | null, scope: string) => !!a?.scope?.split(' ').includes(scope);
+
 const subscribe = (l: () => void) => {
   listeners.add(l);
   return () => listeners.delete(l);
@@ -84,7 +115,9 @@ export function useGoogleAuth() {
     token: valid ? a!.accessToken! : null,
     calendarName: a?.calendarName,
     /** False for connections made before write access was added: they must reconnect once. */
-    canWrite: !!a?.scope?.split(' ').includes(SCOPE),
+    canWrite: hasScope(a, EVENTS_SCOPE),
+    /** False when only the primary calendar can be read (connected before the calendar-list permission). */
+    allCalendars: hasScope(a, CALENDARLIST_SCOPE),
   };
 }
 
@@ -98,7 +131,7 @@ export function connectGoogle() {
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: `${location.origin}/`,
     response_type: 'token',
-    scope: SCOPE,
+    scope: `${EVENTS_SCOPE} ${CALENDARLIST_SCOPE}`,
     include_granted_scopes: 'true',
     state,
   });
@@ -149,6 +182,7 @@ type EventTime = { date?: string | null; dateTime?: string | null; timeZone?: st
 
 type ApiEvent = {
   id: string;
+  recurringEventId?: string;
   status?: string;
   summary?: string;
   htmlLink?: string;
@@ -169,7 +203,11 @@ export type EventInput = {
 async function api(token: string, path: string, init: RequestInit = {}): Promise<Response> {
   const res = await fetch(`${API}${path}`, {
     ...init,
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+      ...init.headers,
+    },
   });
   if (res.status === 401) {
     writeAuth({ ...auth, accessToken: undefined, expiresAt: undefined });
@@ -178,9 +216,9 @@ async function api(token: string, path: string, init: RequestInit = {}): Promise
   if (res.status === 403) {
     const body = await res.text();
     if (body.includes('insufficient')) {
-      // Token lacks write scope: show "Allow adding events" instead of retrying forever.
+      // Token lacks a needed scope: show "Update permissions" instead of retrying forever.
       writeAuth({ ...auth, scope: undefined });
-      throw new GoogleAuthExpired('Google Calendar write access is needed');
+      throw new GoogleAuthExpired('Google Calendar permission is needed');
     }
     throw new Error(`Google Calendar error (403)`);
   }
@@ -219,36 +257,101 @@ export async function deleteEvent(token: string, eventId: string): Promise<void>
   }
 }
 
-/** Events on the primary calendar for a month (plus a week either side). `month` is YYYY-MM. */
-export async function listMonthEvents(token: string, month: string): Promise<GEvent[]> {
+type CalendarInfo = { id: string; color?: string };
+let calendarCache: { token: string; calendars: CalendarInfo[] } | null = null;
+
+/** Calendars ticked in the user's Google Calendar sidebar; primary only without the calendar-list scope. */
+async function visibleCalendars(token: string): Promise<CalendarInfo[]> {
+  if (!hasScope(auth, CALENDARLIST_SCOPE)) return [{ id: 'primary' }];
+  if (calendarCache?.token === token) return calendarCache.calendars;
+  const res = await api(token, '/users/me/calendarList?minAccessRole=reader&maxResults=250');
+  const body = (await res.json()) as {
+    items?: { id: string; primary?: boolean; selected?: boolean; hidden?: boolean; backgroundColor?: string }[];
+  };
+  const calendars = (body.items ?? [])
+    .filter((c) => c.primary || (c.selected && !c.hidden))
+    .map((c) => ({ id: c.primary ? 'primary' : c.id, color: c.backgroundColor }));
+  calendarCache = { token, calendars: calendars.length ? calendars : [{ id: 'primary' }] };
+  return calendarCache.calendars;
+}
+
+async function listCalendarEvents(token: string, calendarId: string, params: URLSearchParams): Promise<ApiEvent[]> {
+  const items: ApiEvent[] = [];
+  const query = new URLSearchParams(params);
+  for (let page = 0; page < 5; page++) {
+    const res = await api(token, `/calendars/${encodeURIComponent(calendarId)}/events?${query}`);
+    const body = (await res.json()) as { items?: ApiEvent[]; nextPageToken?: string; summary?: string };
+    items.push(...(body.items ?? []));
+    if (calendarId === 'primary' && body.summary && body.summary !== auth?.calendarName) {
+      writeAuth({ ...auth, calendarName: body.summary });
+    }
+    if (!body.nextPageToken) break;
+    query.set('pageToken', body.nextPageToken);
+  }
+  return items.filter((e) => e.status !== 'cancelled');
+}
+
+/** Events for a month (plus a week either side) across the user's visible calendars. `month` is YYYY-MM. */
+export async function listMonthEvents(token: string, month: string): Promise<MonthEvents> {
   const [y, m] = month.split('-').map(Number);
-  const base = new URLSearchParams({
+  const fromDate = new Date(y, m - 1, -6);
+  const toDate = new Date(y, m, 8);
+  const params = new URLSearchParams({
     singleEvents: 'true',
     orderBy: 'startTime',
     maxResults: '2500',
-    timeMin: new Date(y, m - 1, -6).toISOString(),
-    timeMax: new Date(y, m, 8).toISOString(),
+    timeMin: fromDate.toISOString(),
+    timeMax: toDate.toISOString(),
   });
 
-  const items: ApiEvent[] = [];
-  let pageToken: string | undefined;
-  for (let page = 0; page < 5; page++) {
-    if (pageToken) base.set('pageToken', pageToken);
-    const res = await api(token, `${PRIMARY}?${base}`);
-    const body = (await res.json()) as { items?: ApiEvent[]; nextPageToken?: string; summary?: string };
-    items.push(...(body.items ?? []));
-    if (body.summary && body.summary !== auth?.calendarName) writeAuth({ ...auth, calendarName: body.summary });
-    pageToken = body.nextPageToken;
-    if (!pageToken) break;
-  }
+  const calendars = await visibleCalendars(token);
+  const perCalendar = await Promise.all(
+    calendars.map(async (c) => {
+      try {
+        return { c, items: await listCalendarEvents(token, c.id, params) };
+      } catch (e) {
+        // One unreadable secondary calendar shouldn't hide everything else.
+        if (c.id === 'primary' || e instanceof GoogleAuthExpired) throw e;
+        return { c, items: [] };
+      }
+    }),
+  );
 
-  // Events created from todos are already shown as todos, so leave them out.
-  return items
-    .filter((e) => e.status !== 'cancelled' && !e.extendedProperties?.private?.[TODO_ID_PROP])
-    .map(toGEvent);
+  const events: GEvent[] = [];
+  const appEvents: AppEvent[] = [];
+  for (const { c, items } of perCalendar) {
+    for (const e of items) {
+      const todoId = e.extendedProperties?.private?.[TODO_ID_PROP];
+      const g = toGEvent(e, c.color);
+      if (todoId) {
+        // Already shown as a todo; kept separately so edits made in Google can flow back.
+        const summary = e.summary ?? '';
+        const done = summary.startsWith(DONE_PREFIX);
+        appEvents.push({
+          id: e.id,
+          recurringEventId: e.recurringEventId,
+          todoId,
+          title: done ? summary.slice(DONE_PREFIX.length) : summary,
+          done,
+          date: g.days[0],
+          time: g.time,
+          duration: g.duration,
+        });
+      } else {
+        events.push(g);
+      }
+    }
+  }
+  events.sort((a, b) => Number(!a.allDay) - Number(!b.allDay) || a.start.getTime() - b.start.getTime());
+  return { events, appEvents, from: toKey(fromDate), to: toKey(toDate) };
 }
 
-function toGEvent(e: ApiEvent): GEvent {
+/** Prefix added to the title of events whose todo is done. */
+export const DONE_PREFIX = '✓ ';
+
+const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+function toGEvent(e: ApiEvent, color?: string): GEvent {
   const allDay = !!e.start.date;
   const start = allDay ? localDate(e.start.date!) : new Date(e.start.dateTime!);
   const end = allDay ? localDate(e.end.date!) : new Date(e.end.dateTime!);
@@ -260,7 +363,18 @@ function toGEvent(e: ApiEvent): GEvent {
   for (let d = first; d <= last && days.length < 62; d = addDays(d, 1)) days.push(d);
   if (days.length === 0) days.push(first);
 
-  return { id: e.id, title: e.summary || '(No title)', allDay, start, end, days, link: e.htmlLink };
+  return {
+    id: e.id,
+    title: e.summary || '(No title)',
+    allDay,
+    start,
+    end,
+    days,
+    time: allDay ? undefined : hhmm(start),
+    duration: allDay ? undefined : Math.max(1, Math.round((end.getTime() - start.getTime()) / 60_000)),
+    link: e.htmlLink,
+    color,
+  };
 }
 
 function localDate(key: string) {

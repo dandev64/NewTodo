@@ -9,7 +9,7 @@ type Props = {
   status?: TodoStatus;
   defaultDate: string;
   /** Prefill for a new todo, e.g. when importing a calendar event. */
-  initial?: Partial<Pick<Todo, 'title' | 'source' | 'externalId'>>;
+  initial?: Partial<Pick<Todo, 'title' | 'source' | 'externalId' | 'time' | 'duration'>>;
   onClose: () => void;
 };
 
@@ -25,7 +25,16 @@ export function TodoFormSheet({ todo, status = 'todo', defaultDate, initial, onC
     if (!valid) return;
     const patch = { title: title.trim(), goalId, date };
     if (todo) dispatch({ type: 'todo/update', id: todo.id, patch });
-    else dispatch({ type: 'todo/add', ...patch, status, source: initial?.source, externalId: initial?.externalId });
+    else
+      dispatch({
+        type: 'todo/add',
+        ...patch,
+        status,
+        source: initial?.source,
+        externalId: initial?.externalId,
+        time: initial?.time,
+        duration: initial?.duration,
+      });
     onClose();
   };
 

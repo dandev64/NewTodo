@@ -1,46 +1,8 @@
-import { useEffect, useState } from 'react';
 import type { Todo } from '../types';
-import { GoogleAuthExpired, connectGoogle, formatTime, listMonthEvents, useGoogleAuth, type GEvent } from '../lib/google';
+import { connectGoogle, formatTime, useGoogleAuth, type GEvent } from '../lib/google';
 import { CheckIcon, PlusIcon, RepeatIcon } from './icons';
 
-type Cache = { token: string | null; months: Record<string, GEvent[]> };
-
-/** Events for a YYYY-MM month, cached per access token. */
-export function useMonthEvents(month: string) {
-  const { token } = useGoogleAuth();
-  const [cache, setCache] = useState<Cache>({ token: null, months: {} });
-  const [error, setError] = useState<string | null>(null);
-  const [attempt, setAttempt] = useState(0);
-  const events = cache.token === token ? cache.months[month] : undefined;
-
-  useEffect(() => {
-    if (!token || events) return;
-    let cancelled = false;
-    listMonthEvents(token, month)
-      .then((list) => {
-        if (cancelled) return;
-        setError(null);
-        setCache((c) => ({ token, months: { ...(c.token === token ? c.months : {}), [month]: list } }));
-      })
-      .catch((e: unknown) => {
-        if (!cancelled && !(e instanceof GoogleAuthExpired)) setError(e instanceof Error ? e.message : String(e));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [token, month, events, attempt]);
-
-  return {
-    events: events ?? [],
-    loading: !!token && !events && !error,
-    error,
-    refresh: () => {
-      setError(null);
-      setCache({ token: null, months: {} });
-      setAttempt((n) => n + 1);
-    },
-  };
-}
+export { useMonthEvents } from '../lib/gcalPull';
 
 type Props = {
   date: string;
@@ -80,6 +42,12 @@ export function GoogleDaySection({ date, events, loading, error, todos, onRefres
           <RepeatIcon size={14} />
         </button>
       </div>
+      {!google.allCalendars && (
+        <div className="gcal-expired gcal-upgrade">
+          <span>Showing your main calendar only.</span>
+          <button className="pill-btn" onClick={connectGoogle}>Show all calendars</button>
+        </div>
+      )}
       {error && <p className="gcal-msg error">{error}</p>}
       {!error && loading && <p className="gcal-msg">Loading events…</p>}
       {!error && !loading && dayEvents.length === 0 && <p className="gcal-msg">No events</p>}
@@ -89,7 +57,15 @@ export function GoogleDaySection({ date, events, loading, error, todos, onRefres
           return (
             <li key={e.id} className="gcal-event">
               <span className="gcal-time">{e.allDay ? 'All day' : formatTime(e.start)}</span>
-              <a className="gcal-title" href={e.link} target="_blank" rel="noreferrer">{e.title}</a>
+              <a
+                className="gcal-title"
+                href={e.link}
+                target="_blank"
+                rel="noreferrer"
+                style={e.color ? { borderLeftColor: e.color } : undefined}
+              >
+                {e.title}
+              </a>
               <button
                 className={`icon-btn gcal-add ${done ? 'added' : ''}`}
                 disabled={done}

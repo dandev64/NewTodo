@@ -26,8 +26,10 @@ export type TodoStatus = 'todo' | 'doing' | 'done';
  */
 export type TodoGcal = {
   eventId?: string;
-  /** Signature of the event content last written to Google. */
+  /** Signature of the event content last written to (or read from) Google. */
   syncedSig?: string;
+  /** When syncedSig was set (ms). Fetched Google data older than this is ignored for this todo. */
+  syncedAt?: number;
   error?: string;
   /** Signature that produced `error`; we don't retry until the todo changes. */
   errorSig?: string;
