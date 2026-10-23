@@ -29,7 +29,7 @@ npm run lint     # oxlint (3 known "only-export-components" warnings in store.ts
 npm run preview  # serve dist/ (service worker only registers in production builds)
 ```
 
-`.env.local` (git-ignored via `*.local`) holds `VITE_GOOGLE_CLIENT_ID`. See `.env.example`.
+`.env.local` (git-ignored) holds `VITE_GOOGLE_CLIENT_ID` (and a `VERCEL_OIDC_TOKEN` written by `vercel link` — leave it). See `.env.example`.
 Vite only reads env files at startup — **restart `npm run dev` after editing it**.
 
 ## Stack
@@ -112,7 +112,8 @@ public/
 - `public/sw.js`: network-first for page navigations (cached `/` fallback offline), cache-first for hashed
   `/assets/*`. **Never caches cross-origin requests** (Google APIs). Bump `CACHE` name if caching logic changes.
 - Registered only in production builds, so dev/HMR isn't affected.
-- Deployed on **Vercel** via GitHub import (auto-deploys on push to `main`); `vercel.json` sets `no-cache` on `sw.js`
+- Live at **https://newtodo-beryl.vercel.app** — Vercel project `newtodo` (team `daniel-medados-projects`), connected
+  to GitHub so every push to `main` auto-deploys; `vercel.json` sets `no-cache` on `sw.js`
   so updates reach installed apps. iPhone install requires this HTTPS deployment. Home-screen web apps are
   exempt from Safari's 7-day storage eviction, but data is still per-device until there's sync.
 

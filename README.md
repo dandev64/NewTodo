@@ -4,6 +4,8 @@ A mobile-first todo app inspired by [Todo Mate](https://www.todomate.net/): a mo
 your progress, color-coded goals, a Kanban board, and Google Calendar events alongside your todos.
 Installable on iPhone/Android as a home-screen web app (PWA). Data is stored locally in the browser.
 
+**Live:** https://newtodo-beryl.vercel.app
+
 ## Features
 
 - **Calendar**: month/week view; each day shows how many todos are left, or a colored ✓ when everything is done.
