@@ -1,18 +1,18 @@
 import { useState } from 'react';
 import { HomePage } from './pages/HomePage';
 import { BoardPage } from './pages/BoardPage';
-import { GoalsPage } from './pages/GoalsPage';
+import { CategoriesPage } from './pages/CategoriesPage';
 import { MyPage } from './pages/MyPage';
-import { BoardIcon, FlagIcon, HomeIcon, UserIcon } from './components/icons';
+import { BoardIcon, HomeIcon, TagIcon, UserIcon } from './components/icons';
 import { useGoogleSync } from './lib/gcalSync';
 import './App.css';
 
-type Tab = 'home' | 'board' | 'goals' | 'my';
+type Tab = 'home' | 'board' | 'categories' | 'my';
 
 const TABS: { id: Tab; label: string; icon: typeof HomeIcon }[] = [
   { id: 'home', label: 'Home', icon: HomeIcon },
   { id: 'board', label: 'Board', icon: BoardIcon },
-  { id: 'goals', label: 'Goals', icon: FlagIcon },
+  { id: 'categories', label: 'Categories', icon: TagIcon },
   { id: 'my', label: 'My', icon: UserIcon },
 ];
 
@@ -30,9 +30,9 @@ export default function App({ notice }: { notice?: string | null }) {
         </div>
       )}
       <main className="content">
-        {tab === 'home' && <HomePage onGoToGoals={() => setTab('goals')} />}
+        {tab === 'home' && <HomePage />}
         {tab === 'board' && <BoardPage />}
-        {tab === 'goals' && <GoalsPage />}
+        {tab === 'categories' && <CategoriesPage />}
         {tab === 'my' && <MyPage />}
       </main>
 

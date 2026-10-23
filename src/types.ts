@@ -1,8 +1,11 @@
+/** A category (Todo Mate calls them goals). Shown as "Category" in the UI. */
 export type Goal = {
   id: string;
   title: string;
   color: string;
   createdAt: number;
+  /** "Ended": hidden from Home and pickers for new todos; past todos are kept. */
+  archived?: boolean;
 };
 
 export type RepeatFreq = 'daily' | 'weekly' | 'monthly';

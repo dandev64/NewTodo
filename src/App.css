@@ -1206,3 +1206,71 @@ button.check:active {
   margin-top: 8px;
   gap: 10px;
 }
+
+/* ---------- Categories ---------- */
+
+.add-category-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 14px 0 4px;
+  padding: 6px 12px;
+  border: 1.5px dashed #d6d6dd;
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.add-category-btn:hover {
+  border-color: var(--box-dark);
+  color: #666;
+}
+
+.goal-chip.ended {
+  opacity: 0.7;
+}
+
+.ended-badge {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: #e6e6eb;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.goal-manage-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.goal-manage-item .goal-manage-row {
+  flex: 1;
+  min-width: 0;
+  border-bottom: 0;
+}
+
+.reorder {
+  display: flex;
+}
+
+.reorder .icon-btn {
+  width: 28px;
+  height: 28px;
+  color: #aaa;
+}
+
+.reorder .icon-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.goal-manage-list.ended .goal-chip {
+  opacity: 0.6;
+}
+
+.page-hint {
+  padding: 0 20px 8px;
+}

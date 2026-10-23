@@ -12,7 +12,9 @@ Owner preferences (decided in conversation, don't re-litigate without asking):
 - **Web app + PWA**, not a native/App Store app (no Mac, no $99 Apple dev account needed).
 - **Local storage only** for now — no backend, no accounts.
 - **Mobile-first** narrow layout (max width 440px, centered on desktop) with a bottom tab bar.
-- v1 features chosen: calendar with day-progress icons, colored goals, todo actions, repeat. **Day emoji/diary was
+- v1 features chosen: calendar with day-progress icons, colored goals, todo actions, repeat.
+- **"Goals" are called "Categories" in the UI** (the user's word; same concept as Todo Mate's goals). Code and
+  data keep the `Goal` / `goalId` names — don't rename them (localStorage compatibility). **Day emoji/diary was
   explicitly not wanted.**
 - Kanban: a **built-in board** (not an external tool) was chosen; external board sync (Microsoft Planner is the
   suggested fit) is deferred to the Microsoft OAuth phase.
@@ -44,7 +46,7 @@ Keep it that way unless there's a real need.
 ```
 src/
   main.tsx              Entry. Consumes the Google OAuth redirect hash BEFORE render; registers sw.js in prod.
-  App.tsx               Shell: tab state (home | board | goals | my), bottom tab bar, error banner.
+  App.tsx               Shell: tab state (home | board | categories | my), bottom tab bar, error banner.
   App.css / index.css   All styles. index.css = reset + CSS variables; App.css = components, grouped by section.
   types.ts              Goal, Todo, RepeatRule, TodoStatus, TodoSource, State.
   store.tsx             Reducer + context + localStorage persistence (key `todomate.v1`). All mutations live here.
@@ -56,11 +58,12 @@ src/
   pages/
     HomePage.tsx        Calendar + Google events section + goals with todos (the Todo Mate main screen).
     BoardPage.tsx       Kanban: To do / In progress / Done, range + goal filters, drag & drop, quick-advance button.
-    GoalsPage.tsx       Create / rename / recolor / delete goals (deleting a goal deletes its todos).
+    CategoriesPage.tsx  List, reorder (up/down), edit, end/restore categories; "Ended" section.
     MyPage.tsx          Stats, streak, Google connect/disconnect, reset data.
   components/
     Calendar.tsx        Month/week calendar with per-day icons (remaining count / colored ✓) and event dots.
-    GoalSection.tsx     Goal chip + todo rows + inline add/edit input.
+    GoalSection.tsx     Category chip + todo rows + inline add/edit input (ended categories: no "+").
+    CategoryEditorSheet.tsx  Create/edit a category: name, color, End/Restore, Delete. Used by Home + Categories.
     TodoInput.tsx       Inline input (Enter = add & keep open, Esc/blur = close).
     TodoSheets.tsx      Bottom-sheet actions for a todo: status switch, edit, delete, tomorrow, copy, move, repeat.
     TodoFormSheet.tsx   Full create/edit form (title, goal, date). Used by Board and Google "import as todo".
@@ -79,6 +82,9 @@ public/
   (`toKey`, `fromKey`, `addDays`, …). `new Date().toISOString().slice(0,10)` is wrong (UTC shift) — don't use it.
 - `Todo.done` is the source of truth for completion. `Todo.inProgress` only matters while `done` is false.
   Use `statusOf()` / `statusFields()` from `lib/status.ts` instead of reading/writing these directly for Kanban.
+- `Goal.archived` = an **ended** category: hidden from Home (except on days that still have its todos), from Board
+  filters and from new-todo pickers; its todos are kept. Deleting a category deletes its todos. The order of
+  `State.goals` is the display order (`goal/move` swaps with the next non-ended neighbour).
 - `Todo.order` is the sort order **within one goal on one date**. `nextOrder()` in the store appends to the end.
 - **Repeats are materialized**: setting a repeat rule creates real todo copies up to `rule.until` (max 400), all
   sharing `seriesId`. Changing the rule deletes *unfinished future* instances and regenerates; finished ones are kept.

@@ -5,23 +5,26 @@ import { Calendar } from '../components/Calendar';
 import { GoalSection } from '../components/GoalSection';
 import { TodoSheet, type SheetMode } from '../components/TodoSheets';
 import { TodoFormSheet } from '../components/TodoFormSheet';
+import { CategoryEditorSheet } from '../components/CategoryEditorSheet';
+import { PlusIcon } from '../components/icons';
 import { GoogleDaySection, useMonthEvents } from '../components/GoogleEvents';
 import type { GEvent } from '../lib/google';
 
-type Props = { onGoToGoals: () => void };
-
-export function HomePage({ onGoToGoals }: Props) {
+export function HomePage() {
   const { state } = useStore();
   const [selected, setSelected] = useState(todayKey);
   const [addingGoalId, setAddingGoalId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sheet, setSheet] = useState<{ todoId: string; mode: SheetMode } | null>(null);
   const [importing, setImporting] = useState<GEvent | null>(null);
+  const [addingCategory, setAddingCategory] = useState(false);
 
   const google = useMonthEvents(selected.slice(0, 7));
   const eventDays = useMemo(() => new Set(google.events.flatMap((e) => e.days)), [google.events]);
 
   const dayTodos = state.todos.filter((t) => t.date === selected).sort((a, b) => a.order - b.order);
+  // Ended categories only appear on days that still have todos in them.
+  const visibleGoals = state.goals.filter((g) => !g.archived || dayTodos.some((t) => t.goalId === g.id));
   const sheetTodo = sheet && state.todos.find((t) => t.id === sheet.todoId);
   const sheetGoal = sheetTodo && state.goals.find((g) => g.id === sheetTodo.goalId);
 
@@ -61,16 +64,17 @@ export function HomePage({ onGoToGoals }: Props) {
       />
 
       <section className="goals">
-        {state.goals.length === 0 ? (
+        {visibleGoals.length === 0 ? (
           <div className="empty">
-            <p>Create a goal to start adding todos.</p>
-            <button className="btn primary" onClick={onGoToGoals}>Add a goal</button>
+            <p>Create a category to start adding todos.</p>
+            <button className="btn primary" onClick={() => setAddingCategory(true)}>Add a category</button>
           </div>
         ) : (
-          state.goals.map((goal) => (
+          visibleGoals.map((goal) => (
             <GoalSection
               key={goal.id}
               goal={goal}
+              ended={!!goal.archived}
               date={selected}
               todos={dayTodos.filter((t) => t.goalId === goal.id)}
               adding={addingGoalId === goal.id}
@@ -85,7 +89,13 @@ export function HomePage({ onGoToGoals }: Props) {
             />
           ))
         )}
+        {visibleGoals.length > 0 && (
+          <button className="add-category-btn" onClick={() => setAddingCategory(true)}>
+            <PlusIcon size={14} strokeWidth={2.5} /> Add category
+          </button>
+        )}
       </section>
+      {addingCategory && <CategoryEditorSheet goal={null} onClose={() => setAddingCategory(false)} />}
 
       {sheet && sheetTodo && sheetGoal && (
         <TodoSheet

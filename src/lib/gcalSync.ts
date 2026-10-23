@@ -49,7 +49,7 @@ export function buildEvent(todo: Todo, goal: Goal | undefined): EventInput {
   const timed = !!todo.time;
   return {
     summary: `${todo.done ? DONE_PREFIX : ''}${todo.title}`,
-    description: goal ? `Goal: ${goal.title}\nFrom TODO mate` : 'From TODO mate',
+    description: goal ? `Category: ${goal.title}\nFrom TODO mate` : 'From TODO mate',
     start: timed
       ? { dateTime: localDateTime(todo.date, todo.time!), timeZone, date: null }
       : { date: todo.date, dateTime: null, timeZone: null },

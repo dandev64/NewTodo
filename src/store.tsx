@@ -16,6 +16,8 @@ export type Action =
   | { type: 'goal/add'; title: string; color: string }
   | { type: 'goal/update'; id: string; patch: Partial<Omit<Goal, 'id'>> }
   | { type: 'goal/delete'; id: string }
+  /** Move a category one place up (-1) or down (1) among the active categories. */
+  | { type: 'goal/move'; id: string; dir: -1 | 1 }
   | {
       type: 'todo/add';
       goalId: string;
@@ -117,6 +119,17 @@ function reducer(state: State, action: Action): State {
       };
     case 'goal/update':
       return { ...state, goals: state.goals.map((g) => (g.id === action.id ? { ...g, ...action.patch } : g)) };
+    case 'goal/move': {
+      const goals = [...state.goals];
+      const i = goals.findIndex((g) => g.id === action.id);
+      if (i < 0) return state;
+      // Step over ended categories so the move is visible in the active list.
+      let j = i + action.dir;
+      while (j >= 0 && j < goals.length && goals[j].archived) j += action.dir;
+      if (j < 0 || j >= goals.length) return state;
+      [goals[i], goals[j]] = [goals[j], goals[i]];
+      return { ...state, goals };
+    }
     case 'goal/delete':
       return {
         ...removeTodos(state, (t) => t.goalId !== action.id),

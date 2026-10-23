@@ -16,7 +16,9 @@ type Props = {
 export function TodoFormSheet({ todo, status = 'todo', defaultDate, initial, onClose }: Props) {
   const { state, dispatch } = useStore();
   const [title, setTitle] = useState(todo?.title ?? initial?.title ?? '');
-  const [goalId, setGoalId] = useState(todo?.goalId ?? state.goals[0]?.id ?? '');
+  // Ended categories can't take new todos (but a todo already in one keeps it).
+  const choices = state.goals.filter((g) => !g.archived || g.id === todo?.goalId);
+  const [goalId, setGoalId] = useState(todo?.goalId ?? choices[0]?.id ?? '');
   const [date, setDate] = useState(todo?.date ?? defaultDate);
 
   const valid = !!title.trim() && !!goalId && !!date;
@@ -40,8 +42,8 @@ export function TodoFormSheet({ todo, status = 'todo', defaultDate, initial, onC
 
   return (
     <BottomSheet title={todo ? 'Edit todo' : 'New todo'} onClose={onClose}>
-      {state.goals.length === 0 ? (
-        <p className="hint">Create a goal first in the Goals tab.</p>
+      {choices.length === 0 ? (
+        <p className="hint">Create a category first in the Categories tab.</p>
       ) : (
         <div className="goal-form">
           <input
@@ -54,7 +56,7 @@ export function TodoFormSheet({ todo, status = 'todo', defaultDate, initial, onC
             onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && save()}
           />
           <div className="goal-picker">
-            {state.goals.map((g) => (
+            {choices.map((g) => (
               <button
                 key={g.id}
                 className={`goal-chip static ${g.id === goalId ? 'picked' : ''}`}

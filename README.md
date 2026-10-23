@@ -9,7 +9,8 @@ Installable on iPhone/Android as a home-screen web app (PWA). Data is stored loc
 ## Features
 
 - **Calendar**: month/week view; each day shows how many todos are left, or a colored ✓ when everything is done.
-- **Goals**: colored categories; tap a goal to quickly type todos (Enter keeps adding).
+- **Categories**: colored lists like Todo Mate's; add them right from Home, reorder them, or end one to hide it
+  while keeping its history. Tap a category to quickly type todos (Enter keeps adding).
 - **Todo actions**: edit, delete, do it tomorrow / today, do another day, change date, repeat (daily / weekly / monthly).
 - **Board**: To do / In progress / Done columns with filters by range and goal; drag & drop on desktop.
 - **Google Calendar**: events from all your calendars on Home (auto-refreshing); turn any event into a todo; send todos to Google as all-day or timed events, kept in sync both ways.

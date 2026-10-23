@@ -6,6 +6,8 @@ import { TodoInput } from './TodoInput';
 
 type Props = {
   goal: Goal;
+  /** Ended category: shown for its existing todos, but no new todos can be added. */
+  ended?: boolean;
   date: string;
   todos: Todo[];
   adding: boolean;
@@ -17,18 +19,25 @@ type Props = {
 };
 
 export function GoalSection({
-  goal, date, todos, adding, editingId, onStartAdd, onStopAdd, onStopEdit, onOpenActions,
+  goal, ended, date, todos, adding, editingId, onStartAdd, onStopAdd, onStopEdit, onOpenActions,
 }: Props) {
   const { dispatch } = useStore();
 
   return (
     <div className="goal">
-      <button className="goal-chip" onClick={onStartAdd} style={{ color: goal.color }}>
-        <span className="goal-chip-title">{goal.title}</span>
-        <span className="goal-chip-plus" style={{ background: goal.color }}>
-          <PlusIcon size={10} strokeWidth={4} />
+      {ended ? (
+        <span className="goal-chip static ended" style={{ color: goal.color }}>
+          <span className="goal-chip-title">{goal.title}</span>
+          <span className="ended-badge">Ended</span>
         </span>
-      </button>
+      ) : (
+        <button className="goal-chip" onClick={onStartAdd} style={{ color: goal.color }}>
+          <span className="goal-chip-title">{goal.title}</span>
+          <span className="goal-chip-plus" style={{ background: goal.color }}>
+            <PlusIcon size={10} strokeWidth={4} />
+          </span>
+        </button>
+      )}
 
       <ul className="todo-list">
         {todos.map((todo) =>

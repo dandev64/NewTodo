@@ -77,9 +77,9 @@ export function BoardPage() {
         </div>
         <div className="goal-filter">
           <button className={`filter-chip ${goalFilter === null ? 'active' : ''}`} onClick={() => setGoalFilter(null)}>
-            All goals
+            All categories
           </button>
-          {state.goals.map((g) => (
+          {state.goals.filter((g) => !g.archived || g.id === goalFilter).map((g) => (
             <button
               key={g.id}
               className={`filter-chip ${goalFilter === g.id ? 'active' : ''}`}

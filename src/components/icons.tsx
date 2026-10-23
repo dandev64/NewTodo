@@ -59,6 +59,9 @@ export const BoardIcon = (p: Props) => (
   <Svg {...p}><rect x="3" y="3" width="18" height="18" rx="3" /><path d="M9 3v18M15 3v12" /></Svg>
 );
 export const PlayIcon = (p: Props) => <Svg {...p}><path d="M8 5.5v13l10-6.5z" /></Svg>;
+export const TagIcon = (p: Props) => (
+  <Svg {...p}><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z" /><circle cx="8" cy="8" r="1.5" /></Svg>
+);
 export const ClockIcon = (p: Props) => (
   <Svg {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Svg>
 );

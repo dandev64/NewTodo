@@ -117,7 +117,7 @@ export function MyPage() {
         <li>
           <button
             className="link-danger"
-            onClick={() => confirm('Delete all goals and todos on this device?') && dispatch({ type: 'reset' })}
+            onClick={() => confirm('Delete all categories and todos on this device?') && dispatch({ type: 'reset' })}
           >
             Reset all data
           </button>
