@@ -7,6 +7,7 @@ import { BoardIcon, HomeIcon, TagIcon, UserIcon } from './components/icons';
 import { useGoogleSync } from './lib/gcalSync';
 import { useCloudSync } from './lib/cloudSync';
 import { dismissAccountError, useAccount } from './lib/account';
+import { LoginPage } from './pages/LoginPage';
 import './App.css';
 
 type Tab = 'home' | 'board' | 'categories' | 'my';
@@ -19,8 +20,26 @@ const TABS: { id: Tab; label: string; icon: typeof HomeIcon }[] = [
 ];
 
 export default function App({ notice }: { notice?: string | null }) {
-  const [tab, setTab] = useState<Tab>('home');
+  const account = useAccount();
   const [banner, setBanner] = useState(notice ?? null);
+  const signedIn = !!account.session && !account.session.expired;
+
+  if (!signedIn) {
+    return (
+      <LoginPage
+        notice={account.error ?? banner}
+        onDismissNotice={() => {
+          setBanner(null);
+          dismissAccountError();
+        }}
+      />
+    );
+  }
+  return <SignedInApp banner={banner} onDismissBanner={() => setBanner(null)} />;
+}
+
+function SignedInApp({ banner, onDismissBanner }: { banner: string | null; onDismissBanner: () => void }) {
+  const [tab, setTab] = useState<Tab>('home');
   useGoogleSync();
   useCloudSync();
   const account = useAccount();
@@ -30,7 +49,7 @@ export default function App({ notice }: { notice?: string | null }) {
       {banner && (
         <div className="banner" role="alert">
           <span>{banner}</span>
-          <button onClick={() => setBanner(null)} aria-label="Dismiss">✕</button>
+          <button onClick={onDismissBanner} aria-label="Dismiss">✕</button>
         </div>
       )}
       {account.error && (

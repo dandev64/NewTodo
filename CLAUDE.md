@@ -29,7 +29,7 @@ Owner preferences (decided in conversation, don't re-litigate without asking):
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173 — frontend only; /api is NOT served (sign-in/sync won't work)
+npm run dev      # http://localhost:5173 — frontend only; /api is NOT served, so you can't get past the login page
 vercel dev --listen 5173   # frontend + /api functions (uses Vercel "development" env vars)
 npm run build    # tsc -b && vite build  → dist/
 npm run lint     # oxlint (3 known "only-export-components" warnings in store.tsx — harmless)
@@ -196,6 +196,13 @@ public/
 - **Server (api/sync.ts):** writes for a user are serialized with `pg_advisory_xact_lock` inside one transaction so
   `seq` order = visibility order (pull-after-cursor never skips). Upsert only if `updated_at` is newer.
   `updated_at` is clamped to now + 5 min. Max 500 changes/request, 32 KB/record, 1000 rows/page (`hasMore`).
+- **Login gate:** `App` renders `LoginPage` unless there's a non-expired session; the real app (`SignedInApp`, which
+  mounts the sync hooks) only renders when signed in. Expired sessions land on the login page with a note and keep
+  local data. Redirect errors (e.g. cancelled sign-in) show on the login page.
+- **Switching accounts on one device:** if the stored sync meta belongs to another user id, the engine clears local
+  data (`sync/clear`), forgets the Calendar token and adopts the new account's server data (`meta.adoptRemote`), so
+  one account's todos are never uploaded into another. Data from never-signed-in use (no meta) merges into the first
+  account that signs in.
 - **Sign out** (`signOut()`): clears session + sync meta + local data (`sync/clear`, which does *not* queue Google
   event deletions) and forgets the Calendar token on this device without revoking it. Cloud data stays.
   A 401 from /api/sync marks the session `expired` (local data kept, "Sign in again" shown).

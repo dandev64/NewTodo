@@ -19,7 +19,14 @@ const PUSH_DEBOUNCE_MS = 400;
 
 type Kind = 'goal' | 'todo' | 'settings';
 type RecMeta = { h: string; u: number; p?: 1; d?: 1 };
-type Meta = { userId: string; cursor: number; initialized: boolean; records: Record<string, RecMeta> };
+type Meta = {
+  userId: string;
+  cursor: number;
+  initialized: boolean;
+  records: Record<string, RecMeta>;
+  /** Local data belonged to another account and was cleared: take the server's data as-is. */
+  adoptRemote?: boolean;
+};
 type RemoteChange = { kind: Kind; id: string; data: unknown; updated_at: number; deleted: boolean };
 
 // ---------- hashing ----------
@@ -67,6 +74,15 @@ function loadMeta(userId: string): Meta {
 }
 
 const saveMeta = (m: Meta) => localStorage.setItem(META_KEY, JSON.stringify(m));
+
+/** Which account this device's local data was last synced with, if any. */
+function metaOwner(): string | null {
+  try {
+    return (JSON.parse(localStorage.getItem(META_KEY) ?? 'null') as Meta | null)?.userId ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /** Queue every record that differs from what was last synced. Returns true if anything was queued. */
 function markDirty(meta: Meta, state: State): boolean {
@@ -130,8 +146,20 @@ export function useCloudSync() {
   });
 
   useEffect(() => {
-    metaRef.current = userId ? loadMeta(userId) : null;
-  }, [userId]);
+    if (!userId) {
+      metaRef.current = null;
+      return;
+    }
+    const owner = metaOwner();
+    metaRef.current = loadMeta(userId);
+    if (owner && owner !== userId) {
+      // A different account signed in on this device: drop the previous account's local copy
+      // (it's safe in that account) so it can't be uploaded into this one.
+      forgetGoogle();
+      dispatch({ type: 'sync/clear' });
+      metaRef.current.adoptRemote = true;
+    }
+  }, [userId, dispatch]);
 
   // Turn remote records into a store update; returns false when nothing actually changed locally.
   const applyRemote = (meta: Meta, changes: RemoteChange[], mode: 'merge' | 'replace') => {
@@ -193,10 +221,11 @@ export function useCloudSync() {
         const hasRemoteData = remote.some((c) => !c.deleted);
         // A device with no todos yet (just the starter categories) adopts the account's data
         // instead of uploading duplicate "Work"/"Personal" categories.
-        const pristine = stateRef.current.todos.length === 0;
+        const pristine = !!meta.adoptRemote || stateRef.current.todos.length === 0;
         const changed = hasRemoteData ? applyRemote(meta, remote, pristine ? 'replace' : 'merge') : false;
         meta.cursor = cursor;
         meta.initialized = true;
+        delete meta.adoptRemote;
         saveMeta(meta);
         // If the store changed, the change-tracking effect queues local-only records after re-render.
         if (!changed && markDirty(meta, stateRef.current)) saveMeta(meta);
