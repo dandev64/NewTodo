@@ -15,7 +15,24 @@ if (redirect.signIn) void completeSignIn(redirect.signIn.idToken, redirect.signI
 const notice = redirect.error ?? null;
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+  const hadController = !!navigator.serviceWorker.controller;
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+
+  window.addEventListener('load', async () => {
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    const check = () => reg.update().catch(() => {});
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') check();
+    });
+    setInterval(() => {
+      if (document.visibilityState === 'visible') check();
+    }, 60_000);
+  });
 }
 
 createRoot(document.getElementById('root')!).render(
