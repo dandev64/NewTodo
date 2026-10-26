@@ -43,58 +43,62 @@ export function HomePage() {
         </div>
       </header>
 
-      <Calendar
-        selected={selected}
-        onSelect={selectDate}
-        todos={state.todos}
-        goals={state.goals}
-        eventDays={eventDays}
-      />
+      <div className="home-left">
+        <Calendar
+          selected={selected}
+          onSelect={selectDate}
+          todos={state.todos}
+          goals={state.goals}
+          eventDays={eventDays}
+        />
+      </div>
 
-      <div className="day-label">{formatLong(selected)}</div>
+      <div className="home-right">
+        <div className="day-label">{formatLong(selected)}</div>
 
-      <GoogleDaySection
-        date={selected}
-        events={google.events}
-        loading={google.loading}
-        error={google.error}
-        todos={state.todos}
-        onRefresh={google.refresh}
-        onImport={setImporting}
-      />
+        <GoogleDaySection
+          date={selected}
+          events={google.events}
+          loading={google.loading}
+          error={google.error}
+          todos={state.todos}
+          onRefresh={google.refresh}
+          onImport={setImporting}
+        />
 
-      <section className="goals">
-        {visibleGoals.length === 0 ? (
-          <div className="empty">
-            <p>Create a category to start adding todos.</p>
-            <button className="btn primary" onClick={() => setAddingCategory(true)}>Add a category</button>
-          </div>
-        ) : (
-          visibleGoals.map((goal) => (
-            <GoalSection
-              key={goal.id}
-              goal={goal}
-              ended={!!goal.archived}
-              date={selected}
-              todos={dayTodos.filter((t) => t.goalId === goal.id)}
-              adding={addingGoalId === goal.id}
-              editingId={editingId}
-              onStartAdd={() => {
-                setEditingId(null);
-                setAddingGoalId(goal.id);
-              }}
-              onStopAdd={() => setAddingGoalId((cur) => (cur === goal.id ? null : cur))}
-              onStopEdit={() => setEditingId(null)}
-              onOpenActions={(todo) => setSheet({ todoId: todo.id, mode: 'actions' })}
-            />
-          ))
-        )}
-        {visibleGoals.length > 0 && (
-          <button className="add-category-btn" onClick={() => setAddingCategory(true)}>
-            <PlusIcon size={14} strokeWidth={2.5} /> Add category
-          </button>
-        )}
-      </section>
+        <section className="goals">
+          {visibleGoals.length === 0 ? (
+            <div className="empty">
+              <p>Create a category to start adding todos.</p>
+              <button className="btn primary" onClick={() => setAddingCategory(true)}>Add a category</button>
+            </div>
+          ) : (
+            visibleGoals.map((goal) => (
+              <GoalSection
+                key={goal.id}
+                goal={goal}
+                ended={!!goal.archived}
+                date={selected}
+                todos={dayTodos.filter((t) => t.goalId === goal.id)}
+                adding={addingGoalId === goal.id}
+                editingId={editingId}
+                onStartAdd={() => {
+                  setEditingId(null);
+                  setAddingGoalId(goal.id);
+                }}
+                onStopAdd={() => setAddingGoalId((cur) => (cur === goal.id ? null : cur))}
+                onStopEdit={() => setEditingId(null)}
+                onOpenActions={(todo) => setSheet({ todoId: todo.id, mode: 'actions' })}
+              />
+            ))
+          )}
+          {visibleGoals.length > 0 && (
+            <button className="add-category-btn" onClick={() => setAddingCategory(true)}>
+              <PlusIcon size={14} strokeWidth={2.5} /> Add category
+            </button>
+          )}
+        </section>
+      </div>
       {addingCategory && <CategoryEditorSheet goal={null} onClose={() => setAddingCategory(false)} />}
 
       {sheet && sheetTodo && sheetGoal && (

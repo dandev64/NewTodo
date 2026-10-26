@@ -18,6 +18,7 @@ export type Action =
   | { type: 'goal/delete'; id: string }
   /** Move a category one place up (-1) or down (1) among the active categories. */
   | { type: 'goal/move'; id: string; dir: -1 | 1 }
+  | { type: 'goal/reorder'; ids: string[] }
   | {
       type: 'todo/add';
       goalId: string;
@@ -36,6 +37,7 @@ export type Action =
   | { type: 'todo/setStatus'; id: string; status: TodoStatus }
   | { type: 'todo/delete'; id: string }
   | { type: 'todo/deleteFollowing'; id: string }
+  | { type: 'todo/reorder'; goalId: string; date: string; ids: string[] }
   | { type: 'todo/move'; id: string; date: string }
   | { type: 'todo/copy'; id: string; date: string }
   | { type: 'todo/repeat'; id: string; rule: RepeatRule | null }
@@ -155,6 +157,15 @@ function reducer(state: State, action: Action): State {
       [goals[i], goals[j]] = [goals[j], goals[i]];
       return { ...state, goals };
     }
+    case 'goal/reorder': {
+      const order = new Map(action.ids.map((id, i) => [id, i]));
+      const goals = [...state.goals].sort((a, b) => {
+        const ao = order.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+        const bo = order.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+        return ao - bo || (a.id < b.id ? -1 : 1);
+      });
+      return { ...state, goals };
+    }
     case 'goal/delete':
       return {
         ...removeTodos(state, (t) => t.goalId !== action.id),
@@ -200,6 +211,18 @@ function reducer(state: State, action: Action): State {
         state,
         (t) => t.id !== src.id && !(src.seriesId && t.seriesId === src.seriesId && t.date >= src.date),
       );
+    }
+    case 'todo/reorder': {
+      const idOrder = new Map(action.ids.map((id, i) => [id, i]));
+      return {
+        ...state,
+        todos: state.todos.map((t) => {
+          const pos = idOrder.get(t.id);
+          return pos !== undefined && t.goalId === action.goalId && t.date === action.date
+            ? { ...t, order: pos }
+            : t;
+        }),
+      };
     }
     case 'todo/move':
       return mapTodo(action.id, (t) => ({

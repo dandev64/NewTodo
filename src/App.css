@@ -14,6 +14,13 @@
   box-shadow: 0 0 40px rgba(0, 0, 0, 0.06);
 }
 
+.app-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
 .content {
   flex: 1;
   /* + keyboard height while it's open, so the last row can still scroll above it. */
@@ -740,6 +747,52 @@ button.check:active {
   font-weight: 600;
 }
 
+/* ---------- Sidebar (desktop) ---------- */
+
+.sidebar {
+  display: none;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 24px;
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: -0.3px;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-tab {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 15px;
+  color: #888;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.sidebar-tab.active {
+  background: var(--chip-bg);
+  color: var(--text);
+}
+
+@media (hover: hover) {
+  .sidebar-tab:hover {
+    background: var(--chip-bg);
+  }
+}
+
 /* ---------- Tab bar ---------- */
 
 .tabbar {
@@ -1232,6 +1285,32 @@ button.check:active {
   gap: 10px;
 }
 
+/* ---------- Drag-to-reorder ---------- */
+
+.grip {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  flex-shrink: 0;
+  color: #ccc;
+  cursor: grab;
+  touch-action: none;
+}
+
+.grip:active {
+  cursor: grabbing;
+  color: #999;
+}
+
+.sort-dragging {
+  opacity: 0.35;
+}
+
+.sort-over {
+  box-shadow: inset 0 2px 0 0 var(--text);
+}
+
 /* ---------- Categories ---------- */
 
 .add-category-btn {
@@ -1339,6 +1418,105 @@ button.check:active {
   justify-content: center;
   gap: 8px;
   width: 100%;
+}
+
+/* ---------- Desktop layout (≥ 900px) ---------- */
+
+@media (min-width: 900px) {
+  :root {
+    background: #fff;
+  }
+
+  .app {
+    max-width: none;
+    flex-direction: row;
+    height: 100dvh;
+    box-shadow: none;
+  }
+
+  .app-main {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    width: 220px;
+    flex-shrink: 0;
+    padding: 20px 12px;
+    border-right: 1px solid var(--line);
+  }
+
+  .tabbar {
+    display: none;
+  }
+
+  .content {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+    padding-bottom: 24px;
+  }
+
+  /* Home: two-panel */
+  .page.home {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    height: 100%;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .page.home .topbar {
+    display: none;
+  }
+
+  .home-left {
+    border-right: 1px solid var(--line);
+    overflow-y: auto;
+    padding: 20px 0 24px;
+  }
+
+  .home-right {
+    overflow-y: auto;
+    padding: 20px 0 24px;
+  }
+
+  .home-right .day-label {
+    padding-top: 0;
+  }
+
+  /* Board: equal columns */
+  .board-page .board {
+    scroll-snap-type: none;
+  }
+
+  .board-page .column {
+    flex: 1 1 0;
+    min-width: 200px;
+  }
+
+  /* Other pages: limit width */
+  .page:not(.home):not(.board-page) {
+    max-width: 680px;
+    margin: 0 auto;
+  }
+
+  /* Show drag handles on desktop */
+  .grip {
+    display: flex;
+  }
+
+  /* Hide up/down arrows on desktop (drag handles replace them) */
+  .reorder {
+    display: none;
+  }
+
+  /* Sheets: don't stretch too wide on desktop */
+  .sheet {
+    max-width: 480px;
+  }
 }
 
 /* ---------- Phones & touch screens ---------- */

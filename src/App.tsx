@@ -46,24 +46,44 @@ function SignedInApp({ banner, onDismissBanner }: { banner: string | null; onDis
 
   return (
     <div className="app">
-      {banner && (
-        <div className="banner" role="alert">
-          <span>{banner}</span>
-          <button onClick={onDismissBanner} aria-label="Dismiss">✕</button>
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <span className="brand-mark">✓</span>
+          <span>TODO mate</span>
         </div>
-      )}
-      {account.error && (
-        <div className="banner" role="alert">
-          <span>{account.error}</span>
-          <button onClick={dismissAccountError} aria-label="Dismiss">✕</button>
-        </div>
-      )}
-      <main className="content">
-        {tab === 'home' && <HomePage />}
-        {tab === 'board' && <BoardPage />}
-        {tab === 'categories' && <CategoriesPage />}
-        {tab === 'my' && <MyPage />}
-      </main>
+        <nav className="sidebar-nav">
+          {TABS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              className={`sidebar-tab ${tab === id ? 'active' : ''}`}
+              onClick={() => setTab(id)}
+            >
+              <Icon size={20} strokeWidth={tab === id ? 2.4 : 1.8} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
+      </aside>
+      <div className="app-main">
+        {banner && (
+          <div className="banner" role="alert">
+            <span>{banner}</span>
+            <button onClick={onDismissBanner} aria-label="Dismiss">✕</button>
+          </div>
+        )}
+        {account.error && (
+          <div className="banner" role="alert">
+            <span>{account.error}</span>
+            <button onClick={dismissAccountError} aria-label="Dismiss">✕</button>
+          </div>
+        )}
+        <main className="content">
+          {tab === 'home' && <HomePage />}
+          {tab === 'board' && <BoardPage />}
+          {tab === 'categories' && <CategoriesPage />}
+          {tab === 'my' && <MyPage />}
+        </main>
+      </div>
 
       <nav className="tabbar">
         {TABS.map(({ id, label, icon: Icon }) => (

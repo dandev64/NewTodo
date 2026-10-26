@@ -58,7 +58,7 @@ export function BoardPage() {
   const sheetGoal = sheetTodo && goalsById.get(sheetTodo.goalId);
 
   return (
-    <div className="page">
+    <div className="page board-page">
       <header className="topbar">
         <h1 className="page-title">Board</h1>
         <span className="muted">

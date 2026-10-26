@@ -1,7 +1,8 @@
+import { useRef, useState } from 'react';
 import type { Goal, Todo } from '../types';
 import { useStore } from '../store';
 import { formatHM } from '../lib/date';
-import { CalendarIcon, CheckIcon, MoreIcon, PlusIcon, RepeatIcon } from './icons';
+import { CalendarIcon, CheckIcon, GripIcon, MoreIcon, PlusIcon, RepeatIcon } from './icons';
 import { TodoInput } from './TodoInput';
 
 type Props = {
@@ -22,6 +23,20 @@ export function GoalSection({
   goal, ended, date, todos, adding, editingId, onStartAdd, onStopAdd, onStopEdit, onOpenActions,
 }: Props) {
   const { dispatch } = useStore();
+  const gripActive = useRef(false);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
+
+  const commitReorder = () => {
+    if (dragIdx !== null && overIdx !== null && dragIdx !== overIdx) {
+      const ids = todos.map((t) => t.id);
+      const [moved] = ids.splice(dragIdx, 1);
+      ids.splice(overIdx, 0, moved);
+      dispatch({ type: 'todo/reorder', goalId: goal.id, date, ids });
+    }
+    setDragIdx(null);
+    setOverIdx(null);
+  };
 
   return (
     <div className="goal">
@@ -40,7 +55,7 @@ export function GoalSection({
       )}
 
       <ul className="todo-list">
-        {todos.map((todo) =>
+        {todos.map((todo, idx) =>
           todo.id === editingId ? (
             <li key={todo.id}>
               <TodoInput
@@ -51,7 +66,22 @@ export function GoalSection({
               />
             </li>
           ) : (
-            <li key={todo.id} className={`todo-row ${todo.done ? 'done' : ''}`}>
+            <li
+              key={todo.id}
+              className={`todo-row ${todo.done ? 'done' : ''} ${dragIdx === idx ? 'sort-dragging' : ''} ${overIdx === idx && dragIdx !== null && dragIdx !== idx ? 'sort-over' : ''}`}
+              draggable
+              onDragStart={(e) => {
+                if (!gripActive.current) { e.preventDefault(); return; }
+                e.dataTransfer.effectAllowed = 'move';
+                setDragIdx(idx);
+              }}
+              onDragEnd={() => { gripActive.current = false; commitReorder(); }}
+              onDragOver={(e) => { e.preventDefault(); if (dragIdx !== null) setOverIdx(idx); }}
+              onDrop={(e) => { e.preventDefault(); commitReorder(); }}
+            >
+              <span className="grip" onPointerDown={() => { gripActive.current = true; }}>
+                <GripIcon size={16} />
+              </span>
               <button
                 className="check"
                 style={todo.done ? { background: goal.color } : undefined}

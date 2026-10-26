@@ -7,7 +7,7 @@ import { DEFAULT_DURATION, gcalState } from '../lib/gcalSync';
 import { STATUSES, statusOf } from '../lib/status';
 import { BottomSheet } from './BottomSheet';
 import { DatePicker } from './DatePicker';
-import { ArrowRightIcon, CalendarIcon, ChevronRight, ClockIcon, CopyIcon, EditIcon, RepeatIcon, TrashIcon } from './icons';
+import { ArrowRightIcon, CalendarIcon, ChevronDown, ChevronRight, ChevronUp, ClockIcon, CopyIcon, EditIcon, RepeatIcon, TrashIcon } from './icons';
 
 export type SheetMode = 'actions' | 'move' | 'copy' | 'repeat' | 'delete' | 'schedule';
 
@@ -25,6 +25,21 @@ export function TodoSheet({ todo, goal, mode, setMode, onEdit, onClose }: Props)
   const today = todayKey();
   const overdue = todo.date < today && !todo.done;
   const inSeries = !!todo.seriesId && state.todos.some((t) => t.seriesId === todo.seriesId && t.id !== todo.id);
+
+  const siblings = state.todos
+    .filter((t) => t.goalId === todo.goalId && t.date === todo.date)
+    .sort((a, b) => a.order - b.order);
+  const myIndex = siblings.findIndex((t) => t.id === todo.id);
+  const canMoveUp = myIndex > 0;
+  const canMoveDown = myIndex >= 0 && myIndex < siblings.length - 1;
+
+  const swapOrder = (dir: -1 | 1) => {
+    const ids = siblings.map((t) => t.id);
+    const j = myIndex + dir;
+    [ids[myIndex], ids[j]] = [ids[j], ids[myIndex]];
+    dispatch({ type: 'todo/reorder', goalId: todo.goalId, date: todo.date, ids });
+    onClose();
+  };
 
   const title = (
     <span className="sheet-todo-title">
@@ -121,6 +136,8 @@ export function TodoSheet({ todo, goal, mode, setMode, onEdit, onClose }: Props)
         <Action icon={<CopyIcon />} label="Do another day" onClick={() => setMode('copy')} />
         <Action icon={<CalendarIcon />} label="Change date" onClick={() => setMode('move')} />
         <Action icon={<RepeatIcon />} label="Repeat" onClick={() => setMode('repeat')} />
+        {canMoveUp && <Action icon={<ChevronUp size={20} />} label="Move up" onClick={() => swapOrder(-1)} />}
+        {canMoveDown && <Action icon={<ChevronDown size={20} />} label="Move down" onClick={() => swapOrder(1)} />}
       </div>
       <button className="sheet-row" onClick={() => setMode('schedule')}>
         <ClockIcon size={18} />

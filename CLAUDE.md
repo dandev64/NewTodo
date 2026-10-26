@@ -14,7 +14,8 @@ Owner preferences (decided in conversation, don't re-litigate without asking):
   local-first (localStorage) and synced to **Neon Postgres** through two Vercel Functions. Supabase was dropped
   because the user couldn't log in there; Neon was provisioned through the existing Vercel login (`vercel
   integration add neon`), so no extra accounts. Email/password sign-in was not built.
-- **Mobile-first** narrow layout (max width 440px, centered on desktop) with a bottom tab bar.
+- **Responsive layout**: mobile-first (max width 440px, bottom tab bar) with a desktop mode (≥ 900px: sidebar
+  navigation, two-panel Home with calendar left / tasks right, equal-width Board columns).
 - v1 features chosen: calendar with day-progress icons, colored goals, todo actions, repeat.
 - **"Goals" are called "Categories" in the UI** (the user's word; same concept as Todo Mate's goals). Code and
   data keep the `Goal` / `goalId` names — don't rename them (localStorage compatibility). **Day emoji/diary was
@@ -64,7 +65,7 @@ api/                    Vercel Functions (type-checked by tsconfig.api.json; `_l
 db/schema.sql           users + records tables (apply with scripts/migrate.mjs)
 src/
   main.tsx              Entry. Consumes the Google OAuth redirect hash BEFORE render; registers sw.js in prod.
-  App.tsx               Shell: tab state (home | board | categories | my), bottom tab bar, error banner.
+  App.tsx               Shell: tab state (home | board | categories | my), sidebar (desktop) / bottom tab bar (mobile), error banner.
   App.css / index.css   All styles. index.css = reset + CSS variables; App.css = components, grouped by section.
   types.ts              Goal, Todo, RepeatRule, TodoStatus, TodoSource, State.
   store.tsx             Reducer + context + localStorage persistence (key `todomate.v1`). All mutations live here.
@@ -241,7 +242,8 @@ page — go to `about:blank` first when simulating an OAuth return.
 
 ## Known limitations
 
-- No drag-to-reorder of todos (Home or within a Board column). Board columns sort by date → goal → order.
+- Drag-to-reorder (todos on Home, categories) uses HTML5 DnD → desktop only. Mobile uses the
+  move up/down actions in the todo sheet and the up/down arrows on the Categories page.
 - Board drag & drop uses HTML5 DnD → desktop only; on touch use the ▶ / ✓ quick button or the status switch.
 - Editing a repeating todo's title only changes that one instance.
 - Sync is near-real-time by polling (5 s), not push. Conflicts are last-write-wins per whole record (a todo edited

@@ -68,3 +68,13 @@ export const ClockIcon = (p: Props) => (
 export const UserIcon = (p: Props) => (
   <Svg {...p}><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></Svg>
 );
+export const GripIcon = (p: Props) => (
+  <Svg {...p}>
+    <circle cx="9" cy="5" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="15" cy="5" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="9" cy="19" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="15" cy="19" r="1.5" fill="currentColor" stroke="none" />
+  </Svg>
+);
