@@ -28,6 +28,18 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
+[data-theme="dark"] {
+  --text: #e5e5e7;
+  --muted: #8e8e93;
+  --line: #2c2c2e;
+  --chip-bg: #2c2c2e;
+  --box: #3a3a3c;
+  --box-dark: #4a4a4c;
+  --danger: #ff4f5e;
+  color-scheme: dark;
+  background: #121217;
+}
+
 body {
   margin: 0;
   /* No rubber-band bounce revealing the page background in the home-screen app. */

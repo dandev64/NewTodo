@@ -1720,6 +1720,14 @@ textarea {
   font-weight: 600;
 }
 
+/* ---------- Today button ---------- */
+
+.today-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
 .spinner {
   width: 18px;
   height: 18px;
@@ -1732,5 +1740,255 @@ textarea {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* ---------- Dark mode ---------- */
+
+[data-theme="dark"] .app {
+  background: #1c1c1e;
+  box-shadow: none;
+}
+
+[data-theme="dark"] .brand-mark {
+  background: var(--text);
+  color: #1c1c1e;
+}
+
+[data-theme="dark"] .icon-btn {
+  color: #aaa;
+}
+
+[data-theme="dark"] .cal-month-done {
+  color: #999;
+}
+
+[data-theme="dark"] .day-num {
+  color: #bbb;
+}
+
+[data-theme="dark"] .day.selected .day-num {
+  background: var(--text);
+  color: #1c1c1e;
+}
+
+[data-theme="dark"] .cal-toggle {
+  background: #1c1c1e;
+  border-color: var(--line);
+}
+
+[data-theme="dark"] .sheet {
+  background: #1c1c1e;
+}
+
+[data-theme="dark"] .sheet-handle {
+  background: #4a4a4c;
+}
+
+[data-theme="dark"] .action {
+  background: #2c2c2e;
+}
+
+[data-theme="dark"] .action-icon {
+  color: #bbb;
+}
+
+[data-theme="dark"] .sheet-list-btn {
+  background: #2c2c2e;
+}
+
+[data-theme="dark"] .btn.primary {
+  background: var(--text);
+  color: #1c1c1e;
+}
+
+[data-theme="dark"] .btn.secondary {
+  background: var(--chip-bg);
+}
+
+[data-theme="dark"] .btn.danger {
+  background: #3a1c1e;
+}
+
+[data-theme="dark"] .segmented button {
+  color: #999;
+}
+
+[data-theme="dark"] .segmented button.active {
+  background: #3a3a3c;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .stat {
+  background: #2c2c2e;
+}
+
+[data-theme="dark"] .column {
+  background: #2c2c2e;
+}
+
+[data-theme="dark"] .column.drag-over {
+  background: #3a3a3c;
+}
+
+[data-theme="dark"] .column-count {
+  background: #3a3a3c;
+}
+
+[data-theme="dark"] .column-empty {
+  border-color: #4a4a4c;
+  color: #636366;
+}
+
+[data-theme="dark"] .kcard {
+  background: #1c1c1e;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .kcard-next {
+  color: #999;
+}
+
+[data-theme="dark"] .sidebar-tab {
+  color: #8e8e93;
+}
+
+[data-theme="dark"] .tabbar {
+  background: rgba(28, 28, 30, 0.96);
+  border-top-color: var(--line);
+}
+
+[data-theme="dark"] .tab {
+  color: #636366;
+}
+
+[data-theme="dark"] .todo-row .more {
+  color: #636366;
+}
+
+[data-theme="dark"] .switch {
+  background: #4a4a4c;
+}
+
+[data-theme="dark"] .switch::after {
+  background: #e5e5e7;
+}
+
+[data-theme="dark"] .sheet-row {
+  background: #2c2c2e;
+  color: #bbb;
+}
+
+[data-theme="dark"] .gcal-expired {
+  background: #2c2c2e;
+  color: #999;
+}
+
+[data-theme="dark"] .gcal-add {
+  color: #636366;
+}
+
+[data-theme="dark"] .banner {
+  background: #3a1c1e;
+}
+
+[data-theme="dark"] .grip {
+  color: #4a4a4c;
+}
+
+[data-theme="dark"] .grip:active {
+  color: #636366;
+}
+
+[data-theme="dark"] .add-category-btn {
+  border-color: #4a4a4c;
+}
+
+[data-theme="dark"] .ended-badge {
+  background: #3a3a3c;
+}
+
+[data-theme="dark"] .avatar {
+  color: #999;
+}
+
+[data-theme="dark"] .spinner {
+  border-color: #4a4a4c;
+  border-top-color: var(--text);
+}
+
+[data-theme="dark"] .login-tagline {
+  color: #8e8e93;
+}
+
+[data-theme="dark"] .google-signin {
+  background: #2c2c2e;
+  border-color: #4a4a4c;
+  color: var(--text);
+}
+
+[data-theme="dark"] .login-note {
+  background: #2c2c2e;
+  color: #aaa;
+}
+
+[data-theme="dark"] .login-error {
+  background: #3a1c1e;
+}
+
+[data-theme="dark"] .login-status {
+  color: #aaa;
+}
+
+[data-theme="dark"] .login-mark {
+  background: var(--text);
+  color: #1c1c1e;
+}
+
+@media (hover: hover) {
+  [data-theme="dark"] .action:hover {
+    background: #3a3a3c;
+  }
+
+  [data-theme="dark"] .sheet-row:hover {
+    background: #3a3a3c;
+  }
+
+  [data-theme="dark"] .todo-row .more:hover {
+    color: #aaa;
+  }
+
+  [data-theme="dark"] .kcard:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  [data-theme="dark"] .kcard-next:hover {
+    background: var(--text);
+    color: #1c1c1e;
+  }
+
+  [data-theme="dark"] .google-signin:not(:disabled):hover {
+    background: #3a3a3c;
+  }
+
+  [data-theme="dark"] .add-category-btn:hover {
+    border-color: #636366;
+    color: #999;
+  }
+}
+
+@media (min-width: 900px) {
+  [data-theme="dark"] {
+    background: #121217;
+  }
+}
+
+@media (max-width: 480px) {
+  [data-theme="dark"] {
+    background: #1c1c1e;
+  }
+
+  [data-theme="dark"] .app {
+    box-shadow: none;
   }
 }

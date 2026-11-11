@@ -66,6 +66,7 @@ export type Todo = {
 export type Settings = {
   /** Put newly created todos in Google Calendar automatically. */
   autoGcal?: boolean;
+  darkMode?: boolean;
 };
 
 export type State = {

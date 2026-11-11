@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { HomePage } from './pages/HomePage';
 import { BoardPage } from './pages/BoardPage';
 import { CategoriesPage } from './pages/CategoriesPage';
@@ -7,6 +7,7 @@ import { BoardIcon, HomeIcon, TagIcon, UserIcon } from './components/icons';
 import { useGoogleSync } from './lib/gcalSync';
 import { useCloudSync } from './lib/cloudSync';
 import { dismissAccountError, useAccount } from './lib/account';
+import { useStore } from './store';
 import { LoginPage } from './pages/LoginPage';
 import './App.css';
 
@@ -43,6 +44,15 @@ function SignedInApp({ banner, onDismissBanner }: { banner: string | null; onDis
   useGoogleSync();
   useCloudSync();
   const account = useAccount();
+  const { state } = useStore();
+
+  useEffect(() => {
+    if (state.settings?.darkMode) {
+      document.documentElement.dataset.theme = 'dark';
+    } else {
+      delete document.documentElement.dataset.theme;
+    }
+  }, [state.settings?.darkMode]);
 
   return (
     <div className="app">

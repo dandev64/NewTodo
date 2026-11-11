@@ -73,6 +73,19 @@ export function MyPage() {
         <Stat label="Day streak" value={streak} />
       </div>
 
+      <h2 className="section-title">Appearance</h2>
+      <ul className="settings-list">
+        <li>
+          <span>Dark mode</span>
+          <input
+            type="checkbox"
+            className="switch"
+            checked={!!state.settings?.darkMode}
+            onChange={(e) => dispatch({ type: 'settings/update', patch: { darkMode: e.target.checked } })}
+          />
+        </li>
+      </ul>
+
       <h2 className="section-title">Calendar sync</h2>
       <ul className="settings-list">
         <li>

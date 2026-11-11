@@ -9,6 +9,11 @@ import { trackVisualViewport } from './lib/viewport.ts';
 
 trackVisualViewport();
 
+try {
+  const stored = JSON.parse(localStorage.getItem('todomate.v1') ?? '{}');
+  if (stored.settings?.darkMode) document.documentElement.dataset.theme = 'dark';
+} catch { /* ignore */ }
+
 // Must run before render so the token Google put in the URL hash is consumed exactly once.
 const redirect = handleGoogleRedirect();
 if (redirect.signIn) void completeSignIn(redirect.signIn.idToken, redirect.signIn.nonce);

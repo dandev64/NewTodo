@@ -74,7 +74,10 @@ export function Calendar({ selected, onSelect, todos, goals, eventDays }: Props)
         </div>
         <div className="cal-actions">
           {selected !== today && (
-            <button className="pill-btn" onClick={() => select(today)}>Today</button>
+            <button className="pill-btn today-btn" onClick={() => select(today)}>
+              <ChevronLeft size={14} strokeWidth={2.5} />
+              Today
+            </button>
           )}
           <button className="icon-btn" onClick={() => step(-1)} aria-label="Previous">
             <ChevronLeft size={18} />
