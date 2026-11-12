@@ -1288,7 +1288,7 @@ button.check:active {
 /* ---------- Drag-to-reorder ---------- */
 
 .grip {
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   width: 24px;
@@ -1359,7 +1359,7 @@ button.check:active {
 }
 
 .reorder {
-  display: flex;
+  display: none;
 }
 
 .reorder .icon-btn {
@@ -1503,12 +1503,7 @@ button.check:active {
     margin: 0 auto;
   }
 
-  /* Show drag handles on desktop */
-  .grip {
-    display: flex;
-  }
-
-  /* Hide up/down arrows on desktop (drag handles replace them) */
+  /* Up/down arrows hidden on desktop (drag handles used everywhere) */
   .reorder {
     display: none;
   }
