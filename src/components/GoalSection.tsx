@@ -1,13 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRef } from 'react';
 import type { Goal, Todo } from '../types';
 import { useStore } from '../store';
 import { formatHM } from '../lib/date';
 import { CalendarIcon, CheckIcon, GripIcon, MoreIcon, PlusIcon, RepeatIcon } from './icons';
 import { TodoInput } from './TodoInput';
 
+export type DragCallbacks = {
+  dragIdx: number | null;
+  overGoalId: string | null;
+  overIdx: number | null;
+  onGripDown: (e: React.PointerEvent, todoId: string, goalId: string, idx: number) => void;
+};
+
 type Props = {
   goal: Goal;
-  /** Ended category: shown for its existing todos, but no new todos can be added. */
   ended?: boolean;
   date: string;
   todos: Todo[];
@@ -17,106 +23,28 @@ type Props = {
   onStopAdd: () => void;
   onStopEdit: () => void;
   onOpenActions: (todo: Todo) => void;
+  drag: DragCallbacks;
+  dragSourceGoalId: string | null;
+  registerRef: (goalId: string, el: HTMLUListElement | null) => void;
 };
 
 export function GoalSection({
   goal, ended, date, todos, adding, editingId, onStartAdd, onStopAdd, onStopEdit, onOpenActions,
+  drag, dragSourceGoalId, registerRef,
 }: Props) {
   const { dispatch } = useStore();
-  const [dragIdx, setDragIdx] = useState<number | null>(null);
-  const [overIdx, setOverIdx] = useState<number | null>(null);
-  const listRef = useRef<HTMLUListElement>(null);
-  const dragRef = useRef<{
-    idx: number;
-    startY: number;
-    clone: HTMLElement | null;
-    pointerId: number;
-  } | null>(null);
+  const listRef = useRef<HTMLUListElement | null>(null);
 
-  const commitReorder = useCallback((fromIdx: number, toIdx: number) => {
-    if (fromIdx !== toIdx) {
-      const ids = todos.map((t) => t.id);
-      const [moved] = ids.splice(fromIdx, 1);
-      ids.splice(toIdx, 0, moved);
-      dispatch({ type: 'todo/reorder', goalId: goal.id, date, ids });
-    }
-  }, [todos, dispatch, goal.id, date]);
+  const setListRef = (el: HTMLUListElement | null) => {
+    listRef.current = el;
+    registerRef(goal.id, el);
+  };
 
-  const onDocMove = useRef<((e: PointerEvent) => void) | null>(null);
-  const onDocUp = useRef<((e: PointerEvent) => void) | null>(null);
-
-  const cleanup = useCallback(() => {
-    if (onDocMove.current) document.removeEventListener('pointermove', onDocMove.current);
-    if (onDocUp.current) document.removeEventListener('pointerup', onDocUp.current);
-    if (onDocUp.current) document.removeEventListener('pointercancel', onDocUp.current);
-    onDocMove.current = null;
-    onDocUp.current = null;
-  }, []);
-
-  const handleGripDown = useCallback((e: React.PointerEvent, idx: number) => {
-    const li = (e.target as HTMLElement).closest('li');
-    if (!li || !listRef.current) return;
-
-    e.preventDefault();
-
-    const rect = li.getBoundingClientRect();
-    const clone = li.cloneNode(true) as HTMLElement;
-    clone.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;z-index:9999;opacity:0.9;box-shadow:0 8px 24px rgba(0,0,0,0.18);pointer-events:none;transition:none;`;
-    document.body.appendChild(clone);
-
-    const startY = e.clientY;
-    dragRef.current = { idx, startY, clone, pointerId: e.pointerId };
-    setDragIdx(idx);
-    setOverIdx(idx);
-
-    onDocMove.current = (me: PointerEvent) => {
-      const d = dragRef.current;
-      if (!d || !d.clone || !listRef.current) return;
-      me.preventDefault();
-
-      d.clone.style.transform = `translateY(${me.clientY - d.startY}px)`;
-
-      const items = listRef.current.querySelectorAll<HTMLElement>('li.todo-row');
-      let target = d.idx;
-      for (let i = 0; i < items.length; i++) {
-        const r = items[i].getBoundingClientRect();
-        if (me.clientY > r.top + r.height / 2) target = i;
-      }
-      setOverIdx(target);
-    };
-
-    onDocUp.current = () => {
-      const d = dragRef.current;
-      if (!d) return;
-      if (d.clone) d.clone.remove();
-
-      const from = d.idx;
-      dragRef.current = null;
-      cleanup();
-
-      setDragIdx((prev) => {
-        setOverIdx((over) => {
-          if (prev !== null && over !== null) commitReorder(from, over);
-          return null;
-        });
-        return null;
-      });
-    };
-
-    document.addEventListener('pointermove', onDocMove.current);
-    document.addEventListener('pointerup', onDocUp.current);
-    document.addEventListener('pointercancel', onDocUp.current);
-  }, [commitReorder, cleanup]);
-
-  useEffect(() => {
-    return () => {
-      cleanup();
-      if (dragRef.current?.clone) dragRef.current.clone.remove();
-    };
-  }, [cleanup]);
+  const isDragSource = dragSourceGoalId === goal.id;
+  const isDragTarget = drag.overGoalId === goal.id && !isDragSource;
 
   return (
-    <div className="goal">
+    <div className={`goal ${isDragTarget ? 'drag-target' : ''}`}>
       {ended ? (
         <span className="goal-chip static ended" style={{ color: goal.color }}>
           <span className="goal-chip-title">{goal.title}</span>
@@ -131,7 +59,7 @@ export function GoalSection({
         </button>
       )}
 
-      <ul className="todo-list" ref={listRef}>
+      <ul className="todo-list" ref={setListRef}>
         {todos.map((todo, idx) =>
           todo.id === editingId ? (
             <li key={todo.id}>
@@ -145,11 +73,11 @@ export function GoalSection({
           ) : (
             <li
               key={todo.id}
-              className={`todo-row ${todo.done ? 'done' : ''} ${dragIdx === idx ? 'sort-dragging' : ''} ${overIdx === idx && dragIdx !== null && dragIdx !== idx ? 'sort-over' : ''}`}
+              className={`todo-row ${todo.done ? 'done' : ''} ${isDragSource && drag.dragIdx === idx ? 'sort-dragging' : ''} ${isDragSource && drag.overIdx === idx && drag.dragIdx !== null && drag.dragIdx !== idx ? 'sort-over' : ''} ${isDragTarget && drag.overIdx === idx ? 'sort-over' : ''}`}
             >
               <span
                 className="grip"
-                onPointerDown={(e) => handleGripDown(e, idx)}
+                onPointerDown={(e) => drag.onGripDown(e, todo.id, goal.id, idx)}
               >
                 <GripIcon size={16} />
               </span>

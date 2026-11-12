@@ -1311,6 +1311,11 @@ button.check:active {
   box-shadow: inset 0 2px 0 0 var(--text);
 }
 
+.goal.drag-target {
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 8px;
+}
+
 /* ---------- Categories ---------- */
 
 .add-category-btn {
@@ -1824,6 +1829,10 @@ textarea {
 
 [data-theme="dark"] .column.drag-over {
   background: #3a3a3c;
+}
+
+[data-theme="dark"] .goal.drag-target {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 [data-theme="dark"] .column-count {
