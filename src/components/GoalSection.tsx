@@ -42,61 +42,78 @@ export function GoalSection({
     }
   }, [todos, dispatch, goal.id, date]);
 
+  const onDocMove = useRef<((e: PointerEvent) => void) | null>(null);
+  const onDocUp = useRef<((e: PointerEvent) => void) | null>(null);
+
+  const cleanup = useCallback(() => {
+    if (onDocMove.current) document.removeEventListener('pointermove', onDocMove.current);
+    if (onDocUp.current) document.removeEventListener('pointerup', onDocUp.current);
+    if (onDocUp.current) document.removeEventListener('pointercancel', onDocUp.current);
+    onDocMove.current = null;
+    onDocUp.current = null;
+  }, []);
+
   const handleGripDown = useCallback((e: React.PointerEvent, idx: number) => {
     const li = (e.target as HTMLElement).closest('li');
     if (!li || !listRef.current) return;
 
     e.preventDefault();
-    li.setPointerCapture(e.pointerId);
 
     const rect = li.getBoundingClientRect();
     const clone = li.cloneNode(true) as HTMLElement;
     clone.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;z-index:9999;opacity:0.9;box-shadow:0 8px 24px rgba(0,0,0,0.18);pointer-events:none;transition:none;`;
     document.body.appendChild(clone);
 
-    dragRef.current = { idx, startY: e.clientY, clone, pointerId: e.pointerId };
+    const startY = e.clientY;
+    dragRef.current = { idx, startY, clone, pointerId: e.pointerId };
     setDragIdx(idx);
     setOverIdx(idx);
-  }, []);
 
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    const d = dragRef.current;
-    if (!d || !d.clone || !listRef.current) return;
+    onDocMove.current = (me: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d || !d.clone || !listRef.current) return;
+      me.preventDefault();
 
-    const dy = e.clientY - d.startY;
-    d.clone.style.transform = `translateY(${dy}px)`;
+      d.clone.style.transform = `translateY(${me.clientY - d.startY}px)`;
 
-    const items = listRef.current.querySelectorAll<HTMLElement>('li.todo-row');
-    let target = d.idx;
-    for (let i = 0; i < items.length; i++) {
-      const r = items[i].getBoundingClientRect();
-      if (e.clientY > r.top + r.height / 2) target = i;
-    }
-    setOverIdx(target);
-  }, []);
+      const items = listRef.current.querySelectorAll<HTMLElement>('li.todo-row');
+      let target = d.idx;
+      for (let i = 0; i < items.length; i++) {
+        const r = items[i].getBoundingClientRect();
+        if (me.clientY > r.top + r.height / 2) target = i;
+      }
+      setOverIdx(target);
+    };
 
-  const handlePointerUp = useCallback(() => {
-    const d = dragRef.current;
-    if (!d) return;
-    if (d.clone) d.clone.remove();
+    onDocUp.current = () => {
+      const d = dragRef.current;
+      if (!d) return;
+      if (d.clone) d.clone.remove();
 
-    const from = d.idx;
-    dragRef.current = null;
+      const from = d.idx;
+      dragRef.current = null;
+      cleanup();
 
-    setDragIdx((prev) => {
-      setOverIdx((over) => {
-        if (prev !== null && over !== null) commitReorder(from, over);
+      setDragIdx((prev) => {
+        setOverIdx((over) => {
+          if (prev !== null && over !== null) commitReorder(from, over);
+          return null;
+        });
         return null;
       });
-      return null;
-    });
-  }, [commitReorder]);
+    };
+
+    document.addEventListener('pointermove', onDocMove.current);
+    document.addEventListener('pointerup', onDocUp.current);
+    document.addEventListener('pointercancel', onDocUp.current);
+  }, [commitReorder, cleanup]);
 
   useEffect(() => {
     return () => {
+      cleanup();
       if (dragRef.current?.clone) dragRef.current.clone.remove();
     };
-  }, []);
+  }, [cleanup]);
 
   return (
     <div className="goal">
@@ -133,9 +150,6 @@ export function GoalSection({
               <span
                 className="grip"
                 onPointerDown={(e) => handleGripDown(e, idx)}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerUp}
               >
                 <GripIcon size={16} />
               </span>
