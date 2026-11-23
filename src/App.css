@@ -1210,91 +1210,20 @@ button.check:active {
 
 /* ---------- Memo (per-todo checklist) ---------- */
 
-.memo-badge {
-  gap: 2px;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.memo-list {
-  margin: 4px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.memo-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 40px;
-  border-bottom: 1px solid var(--line);
-}
-
-.memo-check {
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
-}
-
-.memo-text {
-  flex: 1;
-  min-width: 0;
-  font-size: 15px;
-  line-height: 1.35;
-  word-break: break-word;
-}
-
-.memo-item.done .memo-text {
-  color: var(--muted);
-  text-decoration: line-through;
-}
-
-.memo-remove {
-  color: #bbb;
-}
-
-@media (hover: hover) {
-  .memo-remove:hover {
-    color: var(--danger);
-  }
-}
-
-.memo-empty {
-  margin-top: 4px;
-}
-
-.memo-add {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-}
-
 .memo-input {
-  flex: 1;
-  min-width: 0;
-  padding: 10px 12px;
+  display: block;
+  width: 100%;
+  min-height: 160px;
+  margin-top: 8px;
+  padding: 12px 14px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--chip-bg);
   color: var(--text);
+  font: inherit;
+  line-height: 1.45;
+  resize: vertical;
   outline: none;
-}
-
-.memo-add-btn {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  color: #fff;
-  flex-shrink: 0;
-}
-
-.memo-add-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 
 .field select,
@@ -1637,22 +1566,6 @@ textarea {
     font-size: 16px;
   }
 
-  .memo-check {
-    position: relative;
-    width: 24px;
-    height: 24px;
-  }
-
-  button.memo-check::after {
-    content: '';
-    position: absolute;
-    inset: -10px;
-  }
-
-  .memo-item {
-    min-height: 46px;
-  }
-
   /* Apple recommends ~44pt touch targets; grow the hit area without changing the look. */
   .check {
     position: relative;
@@ -1986,10 +1899,6 @@ textarea {
 [data-theme="dark"] .sheet-row {
   background: #2c2c2e;
   color: #bbb;
-}
-
-[data-theme="dark"] .memo-remove {
-  color: #636366;
 }
 
 [data-theme="dark"] .gcal-expired {

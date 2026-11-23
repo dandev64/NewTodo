@@ -98,10 +98,9 @@ export function GoalSection({
                     <RepeatIcon size={11} strokeWidth={2.5} />
                   </span>
                 )}
-                {!!todo.memo?.length && (
-                  <span className="todo-badge memo-badge" title="Memo">
+                {todo.memo && (
+                  <span className="todo-badge" title="Has a memo">
                     <NoteIcon size={11} strokeWidth={2.5} />
-                    {todo.memo.filter((m) => m.done).length}/{todo.memo.length}
                   </span>
                 )}
                 {todo.gcal && (

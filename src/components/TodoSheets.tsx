@@ -1,6 +1,6 @@
-import { useRef, useState, type ReactNode } from 'react';
-import type { Goal, MemoItem, RepeatFreq, Todo } from '../types';
-import { uid, useStore } from '../store';
+import { useState, type ReactNode } from 'react';
+import type { Goal, RepeatFreq, Todo } from '../types';
+import { useStore } from '../store';
 import { WEEKDAY_SHORT, addDays, formatHM, formatLong, fromKey, todayKey } from '../lib/date';
 import { connectGoogle, useGoogleAuth } from '../lib/google';
 import { DEFAULT_DURATION, gcalState } from '../lib/gcalSync';
@@ -9,8 +9,7 @@ import { BottomSheet } from './BottomSheet';
 import { DatePicker } from './DatePicker';
 import { revealAboveKeyboard } from '../lib/viewport';
 import {
-  ArrowRightIcon, CalendarIcon, CheckIcon, ChevronRight, ClockIcon, CopyIcon, EditIcon, NoteIcon, PlusIcon, RepeatIcon,
-  TrashIcon,
+  ArrowRightIcon, CalendarIcon, ChevronRight, ClockIcon, CopyIcon, EditIcon, NoteIcon, RepeatIcon, TrashIcon,
 } from './icons';
 
 export type SheetMode = 'actions' | 'move' | 'copy' | 'repeat' | 'delete' | 'schedule' | 'memo';
@@ -70,7 +69,7 @@ export function TodoSheet({ todo, goal, mode, setMode, onEdit, onClose }: Props)
   if (mode === 'memo') {
     return (
       <BottomSheet title={title} onClose={onClose}>
-        <MemoForm todo={todo} color={goal.color} />
+        <MemoForm todo={todo} />
       </BottomSheet>
     );
   }
@@ -147,7 +146,7 @@ export function TodoSheet({ todo, goal, mode, setMode, onEdit, onClose }: Props)
         <NoteIcon size={18} />
         <span className="sheet-row-label">Memo</span>
         <span className="sheet-row-value">
-          {todo.memo?.length ? `${todo.memo.filter((m) => m.done).length}/${todo.memo.length} done` : 'Add'}
+          {todo.memo ? 'Edit' : 'Add'}
         </span>
         <ChevronRight size={16} />
       </button>
@@ -155,68 +154,20 @@ export function TodoSheet({ todo, goal, mode, setMode, onEdit, onClose }: Props)
   );
 }
 
-function MemoForm({ todo, color }: { todo: Todo; color: string }) {
+function MemoForm({ todo }: { todo: Todo }) {
   const { dispatch } = useStore();
-  const [value, setValue] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-  const memo = todo.memo ?? [];
-  const save = (next: MemoItem[]) => dispatch({ type: 'todo/memo', id: todo.id, memo: next });
-
-  const add = () => {
-    const text = value.trim();
-    if (!text) return;
-    save([...memo, { id: uid(), text, done: false }]);
-    setValue('');
-    if (inputRef.current) revealAboveKeyboard(inputRef.current);
-  };
-
   return (
-    <div className="memo">
-      <ul className="memo-list">
-        {memo.map((item) => (
-          <li key={item.id} className={`memo-item ${item.done ? 'done' : ''}`}>
-            <button
-              className="check memo-check"
-              style={item.done ? { background: color } : undefined}
-              onClick={() => save(memo.map((m) => (m.id === item.id ? { ...m, done: !m.done } : m)))}
-              aria-label={item.done ? 'Mark as not done' : 'Mark as done'}
-            >
-              {item.done && <CheckIcon size={12} strokeWidth={3.5} />}
-            </button>
-            <span className="memo-text">{item.text}</span>
-            <button
-              className="icon-btn memo-remove"
-              onClick={() => save(memo.filter((m) => m.id !== item.id))}
-              aria-label="Remove"
-            >
-              <TrashIcon size={15} />
-            </button>
-          </li>
-        ))}
-      </ul>
-      {!memo.length && <p className="hint memo-empty">List anything you need for this todo.</p>}
-      <div className="memo-add">
-        <input
-          ref={inputRef}
-          className="memo-input"
-          value={value}
-          placeholder="Add to memo"
-          maxLength={300}
-          enterKeyHint="done"
-          autoCapitalize="sentences"
-          autoComplete="off"
-          onChange={(e) => setValue(e.target.value)}
-          onFocus={(e) => revealAboveKeyboard(e.currentTarget)}
-          onKeyDown={(e) => {
-            if (e.nativeEvent.isComposing) return;
-            if (e.key === 'Enter') add();
-          }}
-        />
-        <button className="memo-add-btn" style={{ background: color }} onClick={add} disabled={!value.trim()} aria-label="Add">
-          <PlusIcon size={16} strokeWidth={3} />
-        </button>
-      </div>
-    </div>
+    <textarea
+      className="memo-input"
+      value={todo.memo ?? ''}
+      placeholder="Write anything you need for this todo"
+      rows={8}
+      maxLength={5000}
+      autoCapitalize="sentences"
+      autoFocus
+      onFocus={(e) => revealAboveKeyboard(e.currentTarget)}
+      onChange={(e) => dispatch({ type: 'todo/memo', id: todo.id, memo: e.target.value })}
+    />
   );
 }
 

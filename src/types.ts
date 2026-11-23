@@ -38,13 +38,6 @@ export type TodoGcal = {
   errorSig?: string;
 };
 
-/** One line in a todo's memo checklist. */
-export type MemoItem = {
-  id: string;
-  text: string;
-  done: boolean;
-};
-
 export type Todo = {
   id: string;
   goalId: string;
@@ -68,8 +61,8 @@ export type Todo = {
   externalId?: string;
   /** Pushed to Google Calendar. */
   gcal?: TodoGcal;
-  /** Checklist of notes for this todo. Absent or empty = no memo. */
-  memo?: MemoItem[];
+  /** Free-text notes for this todo. Absent = no memo. */
+  memo?: string;
 };
 
 export type Settings = {

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useReducer, type Dispatch, type ReactNode } from 'react';
-import type { Goal, MemoItem, RepeatRule, Settings, State, Todo, TodoSource, TodoStatus } from './types';
+import type { Goal, RepeatRule, Settings, State, Todo, TodoSource, TodoStatus } from './types';
 import { repeatDates } from './lib/date';
 import { statusFields } from './lib/status';
 
@@ -41,8 +41,8 @@ export type Action =
   | { type: 'todo/move'; id: string; date: string }
   | { type: 'todo/copy'; id: string; date: string }
   | { type: 'todo/repeat'; id: string; rule: RepeatRule | null }
-  /** Replace the todo's memo checklist. */
-  | { type: 'todo/memo'; id: string; memo: MemoItem[] }
+  /** Set the todo's memo text ('' clears it). */
+  | { type: 'todo/memo'; id: string; memo: string }
   /** Set the time (null = all day) and whether the todo is in Google Calendar. */
   | { type: 'todo/schedule'; id: string; time: string | null; duration: number; gcal: boolean }
   | { type: 'gcal/synced'; id: string; eventId: string; sig: string; at: number }
@@ -107,8 +107,7 @@ const inherited = (src: Todo) => ({
   time: src.time,
   duration: src.duration,
   gcal: src.gcal ? {} : undefined,
-  // Each copy gets its own fresh checklist.
-  memo: src.memo?.length ? src.memo.map((m) => ({ id: uid(), text: m.text, done: false })) : undefined,
+  memo: src.memo,
 });
 
 function initialState(): State {
@@ -294,7 +293,7 @@ function reducer(state: State, action: Action): State {
     }
 
     case 'todo/memo':
-      return mapTodo(action.id, (t) => ({ ...t, memo: action.memo.length ? action.memo : undefined }));
+      return mapTodo(action.id, (t) => ({ ...t, memo: action.memo.trim() ? action.memo : undefined }));
 
     case 'todo/schedule': {
       const src = state.todos.find((t) => t.id === action.id);
