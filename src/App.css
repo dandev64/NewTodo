@@ -321,11 +321,16 @@ button.check:active {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--muted);
+  color: var(--text);
   font-size: 13px;
   line-height: 1.35;
   text-align: right;
   cursor: pointer;
+}
+
+.todo-row.done .todo-memo,
+.kcard.done .todo-memo {
+  color: var(--muted);
 }
 
 .todo-memo.open {
