@@ -116,6 +116,9 @@ public/
 - `Todo.time` (`HH:MM`, absent = all day) + `Todo.duration` (minutes). `Todo.gcal` present = mirrored to Google
   (`eventId`, `syncedSig`, `error`/`errorSig`). `State.gcalDeletes` is an outbox of event ids to delete;
   `State.settings.autoGcal` auto-links new todos. Copies/repeats inherit time, duration and the gcal flag.
+- `Todo.memo` (optional `MemoItem[]`: `{ id, text, done }`) is a per-todo checklist, edited in the todo sheet's
+  **Memo** row (`todo/memo` replaces the whole list; empty → `undefined`). Copies/repeats get the same items, unchecked.
+  Not sent to Google Calendar.
 - `State.version` is `1`. If you change the shape incompatibly, bump it and migrate in `load()` in `store.tsx` —
   users have real data in localStorage.
 

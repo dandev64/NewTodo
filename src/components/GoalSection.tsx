@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import type { Goal, Todo } from '../types';
 import { useStore } from '../store';
 import { formatHM } from '../lib/date';
-import { CalendarIcon, CheckIcon, GripIcon, MoreIcon, PlusIcon, RepeatIcon } from './icons';
+import { CalendarIcon, CheckIcon, GripIcon, MoreIcon, NoteIcon, PlusIcon, RepeatIcon } from './icons';
 import { TodoInput } from './TodoInput';
 
 export type DragCallbacks = {
@@ -96,6 +96,12 @@ export function GoalSection({
                 {todo.repeat && (
                   <span className="todo-badge" title="Repeats">
                     <RepeatIcon size={11} strokeWidth={2.5} />
+                  </span>
+                )}
+                {!!todo.memo?.length && (
+                  <span className="todo-badge memo-badge" title="Memo">
+                    <NoteIcon size={11} strokeWidth={2.5} />
+                    {todo.memo.filter((m) => m.done).length}/{todo.memo.length}
                   </span>
                 )}
                 {todo.gcal && (
