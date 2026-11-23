@@ -313,6 +313,19 @@ button.check:active {
   color: var(--muted);
 }
 
+/* Memo preview under the title so notes are visible without opening the sheet. */
+.todo-memo {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+  white-space: pre-line;
+}
+
 .todo-row .more {
   color: #bbb;
   opacity: 0.8;

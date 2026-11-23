@@ -204,6 +204,7 @@ function Card({ todo, goal, overdue, dragging, onOpen, onAdvance, onDragStart, o
             </span>
           )}
         </div>
+        {todo.memo && <div className="todo-memo">{todo.memo}</div>}
         <div className="kcard-meta">
           <span style={{ color: goal.color }}>{goal.title}</span>
           <span className={overdue ? 'overdue' : ''}>

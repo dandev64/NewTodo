@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import type { Goal, Todo } from '../types';
 import { useStore } from '../store';
 import { formatHM } from '../lib/date';
-import { CalendarIcon, CheckIcon, GripIcon, MoreIcon, NoteIcon, PlusIcon, RepeatIcon } from './icons';
+import { CalendarIcon, CheckIcon, GripIcon, MoreIcon, PlusIcon, RepeatIcon } from './icons';
 import { TodoInput } from './TodoInput';
 
 export type DragCallbacks = {
@@ -98,16 +98,12 @@ export function GoalSection({
                     <RepeatIcon size={11} strokeWidth={2.5} />
                   </span>
                 )}
-                {todo.memo && (
-                  <span className="todo-badge" title="Has a memo">
-                    <NoteIcon size={11} strokeWidth={2.5} />
-                  </span>
-                )}
                 {todo.gcal && (
                   <span className="todo-badge gcal-badge" title="In Google Calendar">
                     <CalendarIcon size={11} strokeWidth={2.5} />
                   </span>
                 )}
+                {todo.memo && <span className="todo-memo">{todo.memo}</span>}
               </span>
               <button className="icon-btn more" onClick={() => onOpenActions(todo)} aria-label="More">
                 <MoreIcon size={18} />

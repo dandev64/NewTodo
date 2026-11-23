@@ -117,7 +117,8 @@ public/
   (`eventId`, `syncedSig`, `error`/`errorSig`). `State.gcalDeletes` is an outbox of event ids to delete;
   `State.settings.autoGcal` auto-links new todos. Copies/repeats inherit time, duration and the gcal flag.
 - `Todo.memo` (optional string) is free-text notes for a todo, edited in the todo sheet's **Memo** row
-  (`todo/memo`; blank → `undefined`). Copies/repeats inherit it. Not sent to Google Calendar.
+  (`todo/memo`; blank → `undefined`) and shown as a muted preview (`.todo-memo`, max 3 lines) under the title on
+  Home rows and Board cards. Copies/repeats inherit it. Not sent to Google Calendar.
 - `State.version` is `1`. If you change the shape incompatibly, bump it and migrate in `load()` in `store.tsx` —
   users have real data in localStorage.
 
