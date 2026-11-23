@@ -5,6 +5,7 @@ import { formatHM, formatLong, relativeLabel, todayKey, weekOf } from '../lib/da
 import { STATUSES, statusOf } from '../lib/status';
 import { TodoSheet, type SheetMode } from '../components/TodoSheets';
 import { TodoFormSheet } from '../components/TodoFormSheet';
+import { MemoPreview } from '../components/MemoPreview';
 import { CheckIcon, PlayIcon, PlusIcon, RepeatIcon } from '../components/icons';
 
 type Range = 'today' | 'week' | 'all';
@@ -196,15 +197,17 @@ function Card({ todo, goal, overdue, dragging, onOpen, onAdvance, onDragStart, o
     >
       <span className="kcard-bar" style={{ background: goal.color }} />
       <div className="kcard-body">
-        <div className="kcard-title">
-          {todo.title}
-          {todo.repeat && (
-            <span className="todo-badge">
-              <RepeatIcon size={11} strokeWidth={2.5} />
-            </span>
-          )}
+        <div className="kcard-head">
+          <div className="kcard-title">
+            {todo.title}
+            {todo.repeat && (
+              <span className="todo-badge">
+                <RepeatIcon size={11} strokeWidth={2.5} />
+              </span>
+            )}
+          </div>
+          {todo.memo && <MemoPreview memo={todo.memo} />}
         </div>
-        {todo.memo && <div className="todo-memo">{todo.memo}</div>}
         <div className="kcard-meta">
           <span style={{ color: goal.color }}>{goal.title}</span>
           <span className={overdue ? 'overdue' : ''}>

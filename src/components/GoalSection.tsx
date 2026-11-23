@@ -3,6 +3,7 @@ import type { Goal, Todo } from '../types';
 import { useStore } from '../store';
 import { formatHM } from '../lib/date';
 import { CalendarIcon, CheckIcon, GripIcon, MoreIcon, PlusIcon, RepeatIcon } from './icons';
+import { MemoPreview } from './MemoPreview';
 import { TodoInput } from './TodoInput';
 
 export type DragCallbacks = {
@@ -103,8 +104,8 @@ export function GoalSection({
                     <CalendarIcon size={11} strokeWidth={2.5} />
                   </span>
                 )}
-                {todo.memo && <span className="todo-memo">{todo.memo}</span>}
               </span>
+              {todo.memo && <MemoPreview memo={todo.memo} />}
               <button className="icon-btn more" onClick={() => onOpenActions(todo)} aria-label="More">
                 <MoreIcon size={18} />
               </button>

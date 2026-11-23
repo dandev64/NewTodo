@@ -90,6 +90,7 @@ src/
     TodoFormSheet.tsx   Full create/edit form (title, goal, date). Used by Board and Google "import as todo".
     GoogleEvents.tsx    The Google section on Home (re-exports useMonthEvents from lib/gcalPull).
     (TodoSheets.tsx also holds ScheduleForm — time/duration + "Show in Google Calendar".)
+    MemoPreview.tsx     One-line memo beside a todo title; tap toggles the full text.
     DatePicker.tsx      Month picker used by "Change date" / "Do another day".
     BottomSheet.tsx     Modal sheet (backdrop click / Esc closes).
     icons.tsx           Inline SVG icons.
@@ -117,7 +118,7 @@ public/
   (`eventId`, `syncedSig`, `error`/`errorSig`). `State.gcalDeletes` is an outbox of event ids to delete;
   `State.settings.autoGcal` auto-links new todos. Copies/repeats inherit time, duration and the gcal flag.
 - `Todo.memo` (optional string) is free-text notes for a todo, edited in the todo sheet's **Memo** row
-  (`todo/memo`; blank → `undefined`) and shown as a muted preview (`.todo-memo`, max 3 lines) under the title on
+  (`todo/memo`; blank → `undefined`) and shown beside the title as a muted one-line preview (`MemoPreview`, tap to expand) on
   Home rows and Board cards. Copies/repeats inherit it. Not sent to Google Calendar.
 - `State.version` is `1`. If you change the shape incompatibly, bump it and migrate in `load()` in `store.tsx` —
   users have real data in localStorage.

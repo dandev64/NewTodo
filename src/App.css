@@ -313,17 +313,37 @@ button.check:active {
   color: var(--muted);
 }
 
-/* Memo preview under the title so notes are visible without opening the sheet. */
+/* Memo preview beside the title: one line, tap to expand (MemoPreview). */
 .todo-memo {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  flex: 0 1 auto;
+  max-width: 45%;
+  min-width: 0;
   overflow: hidden;
-  margin-top: 2px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.35;
+  text-align: right;
+  cursor: pointer;
+}
+
+.todo-memo.open {
+  max-width: 60%;
   white-space: pre-line;
+  word-break: break-word;
+  text-align: left;
+}
+
+.kcard-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.kcard-head .kcard-title {
+  flex: 1;
+  min-width: 0;
 }
 
 .todo-row .more {
